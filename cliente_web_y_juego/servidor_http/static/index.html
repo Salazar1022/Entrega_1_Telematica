@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberOps</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-glow bg-glow--1" aria-hidden="true"></div>
+    <div class="bg-glow bg-glow--2" aria-hidden="true"></div>
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <div class="navbar__logo">
+            <span class="logo-mark">⬡</span>
+            <span class="logo-text">CyberOps</span>
+        </div>
+        <div class="navbar__links">
+            <a href="#" class="nav-link">Protocolo</a>
+            <a href="#" class="nav-link">Rangos</a>
+        </div>
+        <div class="navbar__status">
+            <span class="status-dot status-dot--online"></span>
+            <span class="status-label">Servidor activo</span>
+        </div>
+    </nav>
+
+    <!-- MAIN LAYOUT -->
+    <main class="main-layout">
+
+        <!-- LEFT: Branding + stats -->
+        <section class="hero-panel">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <span class="mono">v2.1.4</span>
+                    <span class="badge-sep">|</span>
+                    <span>BETA MULTIJUGADOR</span>
+                </div>
+                <h1 class="hero-title">
+                    Defensa<br>
+                    <em>de Recursos</em>
+                </h1>
+                <p class="hero-subtitle">
+                    Asume tu rol. Ataca la infraestructura o defiéndela.<br>
+                    Cada decisión tiene consecuencias en tiempo real.
+                </p>
+
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-value mono" id="stat-players">—</span>
+                        <span class="stat-label">Jugadores online</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-value mono" id="stat-rooms">—</span>
+                        <span class="stat-label">Salas activas</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-value mono">99.2<span style="font-size:0.7em">%</span></span>
+                        <span class="stat-label">Uptime</span>
+                    </div>
+                </div>
+
+                <!-- Network art -->
+                <div class="network-art" aria-hidden="true">
+                    <svg viewBox="0 0 420 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <line x1="80" y1="70" x2="210" y2="40" stroke="#3B82F6" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.35"/>
+                        <line x1="210" y1="40" x2="330" y2="80" stroke="#06B6D4" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.35"/>
+                        <line x1="210" y1="40" x2="170" y2="160" stroke="#3B82F6" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.35"/>
+                        <line x1="170" y1="160" x2="80" y2="70" stroke="#818CF8" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.28"/>
+                        <line x1="330" y1="80" x2="270" y2="185" stroke="#06B6D4" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.35"/>
+                        <line x1="170" y1="160" x2="270" y2="185" stroke="#3B82F6" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.28"/>
+                        <line x1="80" y1="70" x2="35" y2="155" stroke="#818CF8" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.25"/>
+                        <line x1="270" y1="185" x2="355" y2="205" stroke="#06B6D4" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.25"/>
+                        <!-- Nodes -->
+                        <circle cx="210" cy="40" r="7" fill="#3B82F6" opacity="0.9"/>
+                        <circle cx="210" cy="40" r="14" stroke="#3B82F6" stroke-width="1" opacity="0.25" class="pulse-ring"/>
+                        <circle cx="80" cy="70" r="5" fill="#06B6D4" opacity="0.8"/>
+                        <circle cx="80" cy="70" r="10" stroke="#06B6D4" stroke-width="1" opacity="0.25"/>
+                        <circle cx="330" cy="80" r="5" fill="#818CF8" opacity="0.8"/>
+                        <circle cx="330" cy="80" r="10" stroke="#818CF8" stroke-width="1" opacity="0.25"/>
+                        <circle cx="170" cy="160" r="6" fill="#3B82F6" opacity="0.7"/>
+                        <circle cx="270" cy="185" r="5" fill="#06B6D4" opacity="0.7"/>
+                        <circle cx="35" cy="155" r="4" fill="#818CF8" opacity="0.45"/>
+                        <circle cx="355" cy="205" r="4" fill="#3B82F6" opacity="0.45"/>
+                        <!-- Data flow dots -->
+                        <circle cx="145" cy="55" r="2.5" fill="#3B82F6" opacity="0.6" class="flow-dot flow-dot--1"/>
+                        <circle cx="270" cy="60" r="2.5" fill="#06B6D4" opacity="0.6" class="flow-dot flow-dot--2"/>
+                        <circle cx="190" cy="100" r="2.5" fill="#818CF8" opacity="0.6" class="flow-dot flow-dot--3"/>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT: Login card -->
+        <section class="login-panel">
+            <div class="login-card">
+                <div class="login-card__header">
+                    <h2 class="login-title">Autenticación</h2>
+                    <p class="login-subtitle">Identifícate para acceder al campo de batalla</p>
+                </div>
+
+                <form id="loginForm" action="/login" method="POST" class="login-form">
+
+                    <div class="form-group">
+                        <label for="username" class="form-label">
+                            <span class="label-num mono">01</span>
+                            Identificador de Operador
+                        </label>
+                        <div class="input-wrapper">
+                            <span class="input-prefix">@</span>
+                            <input
+                                type="text"
+                                id="username"
+                                name="username"
+                                placeholder="tu_alias"
+                                required
+                                autocomplete="off"
+                                class="form-input"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password" class="form-label">
+                            <span class="label-num mono">02</span>
+                            Credencial
+                        </label>
+                        <div class="input-wrapper">
+                            <span class="input-prefix">#</span>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                placeholder="tu_password"
+                                required
+                                autocomplete="off"
+                                class="form-input"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span class="label-num mono">03</span>
+                            Rol de Combate
+                        </label>
+                        <input type="hidden" id="role" name="role" value="atacante">
+                        <div class="role-selector" role="group">
+                            <button type="button" class="role-btn role-btn--active" data-role="atacante" onclick="selectRole(this)">
+                                <span class="role-icon">⚔</span>
+                                <span class="role-name">Atacante</span>
+                                <span class="role-desc">Infiltra la red</span>
+                            </button>
+                            <button type="button" class="role-btn" data-role="defensor" onclick="selectRole(this)">
+                                <span class="role-icon">🛡</span>
+                                <span class="role-name">Defensor</span>
+                                <span class="role-desc">Protege los recursos</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="loginError" style="display:none;color:#B91C1C;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:0.55rem 0.75rem;font-size:0.82rem;"></div>
+
+                    <button type="button" class="btn-primary" id="loginBtn" onclick="handleLogin()">
+                        <span class="btn-text">Acceder al Lobby</span>
+                        <span class="btn-arrow">→</span>
+                    </button>
+
+                    <p class="login-note mono">
+                        Sistema distribuido · Arquitectura de Internet
+                    </p>
+                </form>
+
+                <div class="card-corner card-corner--tl" aria-hidden="true"></div>
+                <div class="card-corner card-corner--br" aria-hidden="true"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <span class="mono footer-copy">© 2025 Defensa de Recursos</span>
+        <span class="footer-sep">·</span>
+        <span>Arquitectura y Protocolos de Internet</span>
+        <span class="footer-sep">·</span>
+        <span class="mono">Proyecto Universitario</span>
+    </footer>
+
+    <script>
+        function selectRole(btn) {
+            document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('role-btn--active'));
+            btn.classList.add('role-btn--active');
+            document.getElementById('role').value = btn.dataset.role;
+        }
+
+        function animateStat(id, target) {
+            const el = document.getElementById(id);
+            let current = 0;
+            const step = Math.ceil(target / 25);
+            const timer = setInterval(() => {
+                current = Math.min(current + step, target);
+                el.textContent = current;
+                if (current >= target) clearInterval(timer);
+            }, 45);
+        }
+
+        window.addEventListener('load', () => {
+            setTimeout(() => animateStat('stat-players', 7), 500);
+            setTimeout(() => animateStat('stat-rooms', 3), 700);
+        });
+
+        function showLoginError(message) {
+            const el = document.getElementById('loginError');
+            el.textContent = message;
+            el.style.display = 'block';
+        }
+
+        function clearLoginError() {
+            const el = document.getElementById('loginError');
+            el.textContent = '';
+            el.style.display = 'none';
+        }
+
+        function setLoading(loading) {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const btn = document.getElementById('loginBtn');
+            if (loading) {
+                btn.classList.add('btn--loading');
+                btn.querySelector('.btn-text').textContent = 'Conectando...';
+                btn.querySelector('.btn-arrow').textContent = '⟳';
+            } else {
+                btn.classList.remove('btn--loading');
+                btn.querySelector('.btn-text').textContent = 'Acceder al Lobby';
+                btn.querySelector('.btn-arrow').textContent = '→';
+            }
+
+            return { username, password };
+        }
+
+        async function handleLogin() {
+            const role = document.getElementById('role').value;
+            const { username, password } = setLoading(false);
+
+            clearLoginError();
+            document.getElementById('username').classList.remove('input-error');
+            document.getElementById('password').classList.remove('input-error');
+
+            if (!username || !password) {
+                if (!username) document.getElementById('username').classList.add('input-error');
+                if (!password) document.getElementById('password').classList.add('input-error');
+                showLoginError('Debes ingresar usuario y password.');
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const body = new URLSearchParams({ username, password, role });
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString()
+                });
+
+                const payload = await response.json();
+                if (!response.ok || !payload.ok) {
+                    showLoginError(payload.error || `Error HTTP ${response.status}`);
+                    return;
+                }
+
+                sessionStorage.setItem('co_username', payload.username);
+                sessionStorage.setItem('co_role', payload.role);
+                window.location.href = 'lobby.html';
+            } catch (error) {
+                showLoginError('No fue posible conectar con el servidor HTTP.');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        document.getElementById('username').addEventListener('input', function() {
+            this.classList.remove('input-error');
+            clearLoginError();
+        });
+
+        document.getElementById('password').addEventListener('input', function() {
+            this.classList.remove('input-error');
+            clearLoginError();
+        });
+
+        document.getElementById('loginForm').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleLogin();
+            }
+        });
+    </script>
+</body>
+</html>
