@@ -77,7 +77,7 @@ def handle_client(conn, addr, users):
                     conn.sendall(b"ERR 401 Usuario o contrasena invalidos\n")
                     logging.info(f"[{client_id}] << AUTH FAIL -> {usuario}")
             else:
-                conn.sendall(b"ERR 400 Formato invalido. Uso: AUTH_CHECK <usuario> <password>\n")
+                conn.sendall(b"ERR 400 Formato invalido. Uso: AUTH_CHECK <usuario> <contrasena>\n")
                 logging.info(f"[{client_id}] << Formato invalido: {data[:50]}")
 
         except Exception as e:
