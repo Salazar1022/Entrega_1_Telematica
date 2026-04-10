@@ -1,5 +1,35 @@
 [
   {
+    "usuario": "atacante1",
+    "password_hash": "9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c",
+    "rol": "ATTACKER"
+  },
+  {
+    "usuario": "hacker",
+    "password_hash": "72a666c5d86b3097fe264545dbd37efea220281e59c14f8cb8f0e612f3d12b59",
+    "rol": "ATTACKER"
+  },
+  {
+    "usuario": "admin",
+    "password_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+    "rol": "ATTACKER"
+  },
+  {
+    "usuario": "defensor1",
+    "password_hash": "9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c",
+    "rol": "DEFENDER"
+  },
+  {
+    "usuario": "seguridad",
+    "password_hash": "662c1f79f633a7d11080203bc925fa574e99851e3c1939f3044898cfdbc6d408",
+    "rol": "DEFENDER"
+  },
+  {
+    "usuario": "guardia",
+    "password_hash": "e7f6c39a056e50f764f4f79eded4e46e55383b36dfd7cf36432be8861282f851",
+    "rol": "DEFENDER"
+  },
+  {
     "usuario": "carlos",
     "password_hash": "72a666c5d86b3097fe264545dbd37efea220281e59c14f8cb8f0e612f3d12b59",
     "rol": "ATTACKER"

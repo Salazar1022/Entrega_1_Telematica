@@ -39,6 +39,8 @@
 #define NUM_RESOURCES     2        /* Recursos críticos por sala        */
 #define DETECTION_RADIUS  12       /* Radio de detección al hacer SCAN  */
 #define ATTACK_TIMEOUT    30       /* Segundos para defender un ataque  */
+#define GAME_TIMEOUT      600      /* Duración máx. de partida (seg)    */
+#define IDLE_TIMEOUT_DEF  600      /* Inactividad del cliente (seg)     */
 #define MAX_USERNAME      64       /* Largo máximo del nombre de usuario*/
 #define MAX_ROOM_ID       16       /* Largo máximo del ID de sala       */
 
@@ -106,6 +108,8 @@ typedef struct {
     int          attacker_count;            /* Cuántos son atacantes       */
     int          defender_count;            /* Cuántos son defensores      */
     Resource     resources[NUM_RESOURCES];  /* Recursos del mapa           */
+    time_t       game_start_time;           /* Timestamp de inicio (RUNNING)*/
+    int          game_timeout;             /* Duración máx. de partida (s) */
     pthread_mutex_t room_mutex;             /* Mutex para acceso seguro    */
 } Room;
 
@@ -196,10 +200,27 @@ int resource_defend(Player *defender, int resource_id);
 void room_broadcast(int room_id, const char *message, Player *exclude);
 
 /*
+ * room_broadcast_role()
+ * Igual que room_broadcast pero solo envía a jugadores con el rol especificado.
+ * Si exclude != NULL, ese jugador es omitido aunque tenga el rol correcto.
+ * Uso típico: difundir resultado de SCAN solo a los demás atacantes.
+ */
+void room_broadcast_role(int room_id, const char *message,
+                         Player *exclude, PlayerRole role);
+
+/*
  * room_remove_player()
  * Elimina al jugador de la sala cuando se desconecta.
  * Thread-safe (usa el mutex de la sala).
  */
 void room_remove_player(Player *player);
+
+/*
+ * room_check_timers()
+ * Revisa todos los ataques activos (timer de 30 s) y el timer global de
+ * partida (GAME_TIMEOUT). Debe llamarse periódicamente desde un hilo
+ * dedicado. Emite EVENT ATTACK_TIMEOUT / EVENT GAME_OVER según corresponda.
+ */
+void room_check_timers(int game_timeout_secs);
 
 #endif /* GAME_LOGIC_H */

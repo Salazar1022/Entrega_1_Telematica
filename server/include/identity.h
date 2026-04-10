@@ -8,7 +8,7 @@
  *
  * PROTOCOLO CON EL SERVICIO DE IDENTIDAD (texto plano, TCP):
  *   El servidor C envía:
- *     AUTH <usuario> <password>\n
+ *     AUTH_CHECK <usuario> <password>\n
  *
  *   El servicio responde:
  *     OK ATTACKER\n      → usuario válido, rol atacante
@@ -60,7 +60,7 @@ typedef enum {
  * Proceso:
  *   1. Lee IDENTITY_HOST e IDENTITY_PORT de las variables de entorno
  *   2. Resuelve el hostname con getaddrinfo() (DNS)
- *   3. Se conecta y envía "AUTH <usuario> <password>\n"
+ *   3. Se conecta y envía "AUTH_CHECK <usuario> <password>\n"
  *   4. Parsea la respuesta y extrae el rol
  *   5. Cierra la conexión
  *

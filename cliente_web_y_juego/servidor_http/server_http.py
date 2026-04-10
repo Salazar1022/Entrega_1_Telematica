@@ -24,6 +24,7 @@ def send_response(client_socket, code, reason, body=b"", content_type="text/plai
         f"HTTP/1.1 {code} {reason}\r\n"
         f"Content-Type: {content_type}\r\n"
         f"Content-Length: {len(body)}\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
         "Connection: close\r\n"
         "\r\n"
     ).encode("utf-8")
@@ -204,6 +205,11 @@ def _get_session(req, fields=None):
 
 
 def _parse_rooms(lines):
+    """
+    Parsea líneas ROOM del servidor CGSP v2.
+    Formato del servidor: ROOM <id> <state> <att>/<def>/<max>
+    Ejemplo:             ROOM 1 WAITING 2/1/10
+    """
     rooms = []
     for line in lines:
         if not line.startswith("ROOM "):
@@ -214,16 +220,29 @@ def _parse_rooms(lines):
 
         room_id = parts[1]
         cgsp_state = parts[2].upper()
-        players_info = parts[3]
+        players_info = parts[3]  # formato: att/def/max  (v2)
 
-        players_connected = 0
+        attacker_count = 0
+        defender_count = 0
         max_players = 10
-        if "/" in players_info:
-            p_now, p_max = players_info.split("/", 1)
-            if p_now.isdigit():
-                players_connected = int(p_now)
-            if p_max.isdigit():
-                max_players = int(p_max)
+
+        slash_parts = players_info.split("/")
+        if len(slash_parts) == 3:
+            # Formato v2: attackers/defenders/max
+            if slash_parts[0].isdigit():
+                attacker_count = int(slash_parts[0])
+            if slash_parts[1].isdigit():
+                defender_count = int(slash_parts[1])
+            if slash_parts[2].isdigit():
+                max_players = int(slash_parts[2])
+        elif len(slash_parts) == 2:
+            # Formato v1 (fallback): now/max
+            if slash_parts[0].isdigit():
+                attacker_count = int(slash_parts[0])
+            if slash_parts[1].isdigit():
+                max_players = int(slash_parts[1])
+
+        players_connected = attacker_count + defender_count
 
         if cgsp_state == "RUNNING":
             status = "in_progress"
@@ -239,10 +258,12 @@ def _parse_rooms(lines):
                 "status": status,
                 "max_players": max_players,
                 "players_connected": players_connected,
+                "attacker_count": attacker_count,
+                "defender_count": defender_count,
                 "players": [],
                 "roles": {
-                    "atacante": "open",
-                    "defensor": "open",
+                    "atacante": "taken" if attacker_count > 0 else "open",
+                    "defensor": "taken" if defender_count > 0 else "open",
                 },
             }
         )
@@ -313,6 +334,46 @@ def handle_get_rooms(client_socket, req):
     send_json(client_socket, 200, "OK", {"ok": True, "rooms": rooms})
 
 
+def handle_get_stats(client_socket, req):
+    """
+    GET /api/stats  — retorna jugadores online y salas activas en tiempo real.
+    No requiere sesión (para que el frontend pueda llamarlo antes de login).
+    Si la sesión está disponible úsala; si no, intenta con credenciales admin.
+    """
+    session = _get_session(req)
+    if session is None:
+        # Sin sesión: no podemos consultar al servidor CGSP
+        send_json(client_socket, 200, "OK", {
+            "ok": True,
+            "players_online": 0,
+            "active_rooms": 0,
+            "note": "no_session"
+        })
+        return
+
+    response = cgsp_session_commands(session["username"], session["password"], ["LIST_ROOMS"])
+    if not response["ok"]:
+        send_json(client_socket, 200, "OK", {
+            "ok": True,
+            "players_online": 0,
+            "active_rooms": 0,
+            "note": "cgsp_unavailable"
+        })
+        return
+
+    lines = response["results"][0] if response["results"] else []
+    rooms = _parse_rooms(lines)
+
+    active_rooms = len([r for r in rooms if r["status"] in ("waiting", "in_progress")])
+    players_online = sum(r["players_connected"] for r in rooms)
+
+    send_json(client_socket, 200, "OK", {
+        "ok": True,
+        "players_online": players_online,
+        "active_rooms": active_rooms,
+    })
+
+
 def handle_create_room(client_socket, req):
     fields = parse_form_body(req["body"])
     session = _get_session(req, fields)
@@ -367,7 +428,9 @@ def handle_join_room(client_socket, req):
         send_json(client_socket, 400, "Bad Request", {"ok": False, "error": "Debes enviar room_id"})
         return
 
-    commands = [f"JOIN {room_id}", "START", "LIST_ROOMS"]
+    # Flujo unificado: el lobby web NO inicia la partida automaticamente.
+    # El inicio queda manual (START) desde los clientes desktop.
+    commands = [f"JOIN {room_id}", "LIST_ROOMS"]
     response = cgsp_session_commands(session["username"], session["password"], commands)
     if not response["ok"]:
         code = _to_http_status(response["code"])
@@ -375,8 +438,7 @@ def handle_join_room(client_socket, req):
         return
 
     join_lines = response["results"][0] if len(response["results"]) > 0 else []
-    start_lines = response["results"][1] if len(response["results"]) > 1 else []
-    list_lines = response["results"][2] if len(response["results"]) > 2 else []
+    list_lines = response["results"][1] if len(response["results"]) > 1 else []
 
     join_err = _parse_err(join_lines)
     if join_err:
@@ -385,16 +447,7 @@ def handle_join_room(client_socket, req):
         return
 
     started = False
-    start_message = "Esperando mas jugadores para iniciar"
-    start_err = _parse_err(start_lines)
-    if start_err is None:
-        for line in start_lines:
-            if line.startswith("OK "):
-                started = True
-                start_message = line[3:]
-                break
-    else:
-        start_message = start_err[1]
+    start_message = "Inicio manual: usa START desde el cliente desktop."
 
     rooms = _parse_rooms(list_lines)
     room_payload = next((room for room in rooms if str(room["id"]) == str(room_id)), None)
@@ -408,6 +461,9 @@ def handle_join_room(client_socket, req):
             "players": [],
             "roles": {"atacante": "open", "defensor": "open"},
         }
+    elif room_payload.get("status") == "in_progress":
+        started = True
+        start_message = "Partida iniciada"
 
     send_json(
         client_socket,
@@ -469,9 +525,14 @@ def handle_client(client_socket, addr):
         path = request["path"].split("?", 1)[0]
         print(f"{method} {path}")
 
-        if method == "GET":
+        if method == "OPTIONS":
+            # CORS preflight
+            send_response(client_socket, 204, "No Content", b"", "text/plain")
+        elif method == "GET":
             if path == "/api/rooms":
                 handle_get_rooms(client_socket, request)
+            elif path == "/api/stats":
+                handle_get_stats(client_socket, request)
             else:
                 serve_static(client_socket, path)
         elif method == "POST":

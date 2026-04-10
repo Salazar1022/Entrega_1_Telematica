@@ -290,7 +290,7 @@ public class ClienteDefensor extends JFrame {
     private void recibirEventos() {
         try {
             String linea;
-            // Lee línea por línea gracias al \n en UTF-8 como requiere CGSP v1.0
+            // Lee línea por línea gracias al \n en UTF-8 como requiere CGSP v2.0
             while (connected && (linea = in.readLine()) != null) {
                 if (linea.trim().isEmpty())
                     continue;
@@ -330,19 +330,16 @@ public class ClienteDefensor extends JFrame {
             }
         } else if (c.equals("ROLE")) {
             estado = "AUTENTICADO";
-            // Una vez logueado, unirse a la sala y luego intentar iniciar la partida
-            // (esperando que ya haya al menos 1 atacante y 1 defensor)
+            // El defensor solo hace JOIN y espera EVENT GAME_STARTED.
+            // El START lo envía el atacante con un delay para dar tiempo
+            // a que todos (incluido el 2do defensor) se unan primero.
             new Thread(() -> {
                 try {
                     Thread.sleep(300);
                 } catch (InterruptedException ignored) {
                 }
                 SwingUtilities.invokeLater(() -> enviarEstado("JOIN " + CGSP_ROOM + "\n"));
-                try {
-                    Thread.sleep(400);
-                } catch (InterruptedException ignored) {
-                }
-                SwingUtilities.invokeLater(() -> enviarEstado("START\n"));
+                // NO se envía START aquí. El atacante lo hará tras 5 segundos.
             }).start();
         } else if (c.equals("EVENT")) {
             if (partes.length < 2)
@@ -384,6 +381,32 @@ public class ClienteDefensor extends JFrame {
                     }
                     logModel.add(0, "Exito: Defensa aplicada.");
                     break;
+                case "ATTACK_TIMEOUT":
+                    // RFC_v2: recurso comprometido por expiración del timer de 30 s
+                    if (partes.length >= 3) {
+                        String resId = partes[2];
+                        attackedResources.add(resId); // Quedarse rojo en el mapa
+                        canvas.repaint();
+                        logModel.add(0, "[!!] RECURSO " + resId + " COMPROMETIDO: timer de ataque expiró (30s)");
+                    } else {
+                        logModel.add(0, "[!!] ATAQUE SIN DEFENDER: timer expirado");
+                    }
+                    statusLabel.setText("RECURSO COMPROMETIDO - SIN DEFENSA A TIEMPO");
+                    statusLabel.setForeground(new Color(255, 140, 0));
+                    break;
+                case "GAME_OVER":
+                    String ganador = partes.length >= 3 ? partes[2] : "?";
+                    if ("DEFENDER".equals(ganador)) {
+                        statusLabel.setText("VICTORIA: Todos los ataques fueron repelidos (DEFENDER)");
+                        statusLabel.setForeground(new Color(34, 197, 94));
+                        logModel.add(0, "[GAME OVER] VICTORIA del equipo DEFENSOR");
+                    } else {
+                        statusLabel.setText("DERROTA: Un recurso fue comprometido (ATTACKER WINS)");
+                        statusLabel.setForeground(new Color(220, 38, 38));
+                        logModel.add(0, "[GAME OVER] Victoria del equipo ATACANTE");
+                    }
+                    connected = false;
+                    break;
             }
         } else if (c.equals("ERR")) {
             String code = partes.length > 1 ? partes[1] : "?";
@@ -393,6 +416,12 @@ public class ClienteDefensor extends JFrame {
                 statusLabel.setText("No autorizado (ERR 401)");
             } else if (code.equals("403")) {
                 statusLabel.setText("Accion prohibida (ERR 403)");
+            } else if (code.equals("408")) {
+                // Timeout de inactividad (RFC_v2): conexión cerrada por el servidor
+                connected = false;
+                statusLabel.setText("Sesion cerrada por inactividad (ERR 408)");
+                statusLabel.setForeground(new Color(255, 140, 0));
+                logModel.add(0, "[ERR 408] El servidor cerró la conexión por inactividad");
             } else if (code.equals("409")) {
                 statusLabel.setText("Conflicto de estado (ERR 409)");
             } else if (code.equals("503")) {

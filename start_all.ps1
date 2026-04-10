@@ -5,7 +5,8 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $serverDir  = Join-Path $root "server"
 $httpDir    = Join-Path $root "cliente_web_y_juego\servidor_http"
-$identityPy = Join-Path $serverDir "identity_stub.py"
+$identityDir = Join-Path $root "Protocol_ServiceID"
+$identityPy = Join-Path $identityDir "identity_server.py"
 $serverBin  = Join-Path $serverDir "server.exe"
 
 Write-Host ""
@@ -16,7 +17,7 @@ Write-Host ""
 
 # 1. Servicio de identidad
 Write-Host "[1/3] Iniciando servicio de Identidad (puerto 9090)..." -ForegroundColor Yellow
-$cmd1 = "Set-Location '$serverDir'; Write-Host 'IDENTIDAD iniciando...' -ForegroundColor Cyan; python '$identityPy' 9090"
+$cmd1 = "Set-Location '$identityDir'; Write-Host 'IDENTIDAD (Protocol_ServiceID) iniciando...' -ForegroundColor Cyan; python '$identityPy' 9090 identity.log"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $cmd1
 
 Start-Sleep -Milliseconds 800

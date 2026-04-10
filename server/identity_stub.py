@@ -40,9 +40,10 @@ def handle_client(conn, addr):
         data = conn.recv(512).decode("utf-8").strip()
         print(f"[IDENTITY] Recibido: '{data}'")
 
-        # Parsear: AUTH <usuario> <password>
+        # Parsear: AUTH_CHECK <usuario> <password>  (RFC-CGSP-1 §5)
+        # También acepta AUTH para compatibilidad con clientes legacy
         parts = data.split(" ")
-        if len(parts) == 3 and parts[0] == "AUTH":
+        if len(parts) == 3 and parts[0] in ("AUTH_CHECK", "AUTH"):
             username = parts[1]
             password = parts[2]
 

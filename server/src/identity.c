@@ -70,12 +70,13 @@ IdentityResult identity_authenticate(const char *username,
 
     /*
      * PASO 3: Construir y enviar el mensaje de autenticación.
-     * Formato: "AUTH <usuario> <password>\n"
-     * El '\n' es el delimitador de fin de mensaje en nuestro protocolo.
+    * Formato per RFC-CGSP-2 §5: "AUTH_CHECK <usuario> <password>\n"
+     * El servicio de identidad espera AUTH_CHECK, no AUTH (AUTH es el
+     * comando del cliente CGSP hacia el servidor de juego).
      */
     char request[IDENTITY_BUFSIZE];
     int req_len = snprintf(request, sizeof(request),
-                           "AUTH %s %s\n", username, password);
+                           "AUTH_CHECK %s %s\n", username, password);
 
     if (write(sock, request, req_len) < 0) {
         log_event(LOG_ERROR, NULL, 0, "Error al enviar petición al servicio de identidad");

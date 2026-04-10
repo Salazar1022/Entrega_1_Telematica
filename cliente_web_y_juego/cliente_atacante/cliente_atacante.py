@@ -7,7 +7,7 @@ from tkinter import scrolledtext
 # ──────────────────────────────────────────────────────────────────────────────
 # Configuración del servidor de juego (via variables de entorno o defaults)
 #
-# Usuarios de prueba (deben coincidir con identity_stub.py):
+# Usuarios de prueba (deben coincidir con el servicio de identidad):
 #   atacante1 / pass123  → ATTACKER
 #   hacker    / hack2026 → ATTACKER
 #   admin     / admin    → ATTACKER
@@ -20,6 +20,7 @@ PORT      = int(os.getenv('CGSP_PORT', '8081'))
 CGSP_USER = os.getenv('CGSP_USER', 'atacante1')
 CGSP_PASS = os.getenv('CGSP_PASS', 'pass123')
 CGSP_ROOM = os.getenv('CGSP_ROOM', '1')
+CGSP_AUTO_START = os.getenv('CGSP_AUTO_START', '0').strip().lower() in ('1', 'true', 'yes', 'on')
 
 MAP_WIDTH = 100
 MAP_HEIGHT = 100
@@ -71,7 +72,7 @@ class AtacanteCLI:
 
         tk.Label(
             self.root,
-            text="Controles: W,A,S,D (Mover), V (SCAN), X (ATTACK 0)",
+            text="Controles: W,A,S,D (Mover), V (SCAN), X (ATTACK 0), T (START)",
             font=("Arial", 10)
         ).pack(pady=8)
 
@@ -84,6 +85,7 @@ class AtacanteCLI:
         tk.Button(controls, text="D", width=6, command=lambda: self.move_player(self.step, 0)).grid(row=1, column=2, padx=4, pady=2)
         tk.Button(controls, text="SCAN", width=10, command=self.action_scan).grid(row=0, column=3, padx=10, pady=2)
         tk.Button(controls, text="ATTACK 0", width=10, command=self.action_attack).grid(row=1, column=3, padx=10, pady=2)
+        tk.Button(controls, text="START", width=10, command=self.action_start).grid(row=0, column=4, padx=10, pady=2)
 
         tk.Label(self.root, text="Log de eventos:", font=("Arial", 9, "bold")).pack(pady=(8, 2))
         self.log_box = scrolledtext.ScrolledText(self.root, width=80, height=8, state="disabled", font=("Consolas", 9))
@@ -132,6 +134,8 @@ class AtacanteCLI:
             self.action_scan()
         elif char == 'x':
             self.action_attack()
+        elif char == 't':
+            self.action_start()
 
     def move_player(self, dx, dy):
         if not self.connected:
@@ -155,6 +159,11 @@ class AtacanteCLI:
         if self.connected:
             self.enviar_comando(f"ATTACK {self.selected_resource_id}")
 
+    def action_start(self):
+        if self.connected:
+            self.log("[MANUAL] Enviando START...")
+            self.enviar_comando("START")
+
     def _world_to_canvas(self, x, y):
         scale_x = (CANVAS_SIZE - 1) / (MAP_WIDTH - 1)
         scale_y = (CANVAS_SIZE - 1) / (MAP_HEIGHT - 1)
@@ -175,10 +184,19 @@ class AtacanteCLI:
             return default
 
     def _fallback_resource_xy(self, resource_id):
-        # Si el evento no trae coordenadas, distribuimos puntos en el mapa lógico 0..99.
-        base = abs(hash(resource_id))
-        x = 5 + (base % (MAP_WIDTH - 10))
-        y = 5 + ((base // 101) % (MAP_HEIGHT - 10))
+        """
+        Posición de fallback cuando el servidor no informó coordenadas.
+        IMPORTANTE: debe ser DETERMINÍSTICA (mismo resultado en todos los procesos)
+        para que dos instancias del cliente coincidan.  hash() NO sirve porque
+        Python 3.3+ lo aleatoriza por proceso (PYTHONHASHSEED).
+        Usamos aritmética modular sobre el resource_id.
+        """
+        try:
+            rid = int(resource_id)
+        except (TypeError, ValueError):
+            rid = sum(ord(c) for c in str(resource_id))
+        x = 5 + (rid * 37 + 11) % (MAP_WIDTH  - 10)
+        y = 5 + (rid * 53 + 17) % (MAP_HEIGHT - 10)
         return x, y
 
     def _upsert_resource(self, resource_id, x=None, y=None, attacked=None):
@@ -295,7 +313,13 @@ class AtacanteCLI:
             self.estado = "AUTENTICADO"
             role = partes[1] if len(partes) > 1 else "DESCONOCIDO"
             self.log(f"Rol asignado: {role}")
+            # JOIN a la sala tras recibir ROLE
             threading.Timer(0.5, lambda: self.enviar_comando(f"JOIN {CGSP_ROOM}")).start()
+            if CGSP_AUTO_START:
+                # Opcional: mantener el comportamiento antiguo de auto-start.
+                threading.Timer(5.0, self._intentar_start).start()
+            else:
+                self.log("Inicio manual habilitado: presiona T o el botón START para comenzar la partida.")
         elif c in ('ROOM_CREATED', 'ROOM_LIST', 'ROOM'):
             return
         elif c == 'EVENT':
@@ -323,6 +347,13 @@ class AtacanteCLI:
                     self.root.after(0, lambda rid=resource_id: self._upsert_resource(rid, attacked=False))
                 actor = partes[3] if len(partes) > 3 else "defensor"
                 self.log(f"Defensa aplicada por {actor}")
+            elif event_type == 'ATTACK_TIMEOUT':
+                resource_id = partes[2] if len(partes) > 2 else '?'
+                # Marcar el recurso visualmente como comprometido
+                self.root.after(0, lambda rid=resource_id: self._upsert_resource(rid, attacked=True))
+                self.log(f'[!] RECURSO {resource_id} COMPROMETIDO por timeout de ataque (30s)')
+                self.root.after(0, lambda: self.status_var.set('ATAQUE SIN DEFENDER - DERROTA INMINENTE'))
+                self.root.after(0, lambda: self.status_label.config(fg='orange'))
             elif event_type == 'GAME_OVER':
                 self.root.after(0, lambda: self.status_var.set("PARTIDA FINALIZADA"))
         elif c == 'ERR':
@@ -334,6 +365,11 @@ class AtacanteCLI:
                 self.root.after(0, lambda: self.status_var.set("No autorizado (ERR 401)"))
             elif code == '403':
                 self.root.after(0, lambda: self.status_var.set("Accion prohibida (ERR 403)"))
+            elif code == '408':
+                # Timeout de inactividad: el servidor cerró la conexión (RFC_v2)
+                self.connected = False
+                self.root.after(0, lambda: self.status_var.set("Sesion cerrada por inactividad (ERR 408)"))
+                self.root.after(0, lambda: self.status_label.config(fg="orange"))
             elif code == '409':
                 self.root.after(0, lambda: self.status_var.set("Conflicto de estado (ERR 409)"))
             elif code == '503':
@@ -342,6 +378,15 @@ class AtacanteCLI:
     def log(self, message):
         print(message)
         self.root.after(0, lambda: self._append_log(message))
+
+    def _intentar_start(self):
+        """Envía START al servidor. Si no hay suficientes jugadores (ERR 409)
+        el servidor responde error y el juego sigue en espera sin problema.
+        Si la partida ya fue iniciada por otro jugador, el ERR también es
+        inofensivo. El EVENT GAME_STARTED llega por broadcast cuando arranca."""
+        if self.connected:
+            self.log("[AUTO] Enviando START para iniciar partida...")
+            self.enviar_comando("START")
 
     def _append_log(self, message):
         self.log_box.configure(state="normal")

@@ -350,7 +350,14 @@ static int handle_scan(Player *player) {
     log_event(LOG_INFO, player->client_ip, player->client_port, log_msg);
 
     if (found > 0) {
+        /* Enviar resultado al atacante que hizo SCAN */
         write(player->socket_fd, found_buf, strlen(found_buf));
+        /*
+         * Sincronizar: enviar el mismo resultado a los DEMÁS atacantes
+         * de la sala para que todos vean los recursos descubiertos.
+         * Usamos room_broadcast_role() excluyendo al emisor.
+         */
+        room_broadcast_role(player->room_id, found_buf, player, ROLE_ATTACKER);
     } else {
         send_ok(player->socket_fd, "SCAN: no se encontraron recursos cercanos");
     }

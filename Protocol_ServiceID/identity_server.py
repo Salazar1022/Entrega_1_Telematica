@@ -1,6 +1,8 @@
 # identity_server.py
 import socket, threading, hashlib, json, os, sys, logging
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Logging
 def setup_logging(log_path):
     logging.basicConfig(
@@ -13,8 +15,11 @@ def setup_logging(log_path):
     )
 
 # Cargar usuarios
-def load_users(path="users.json"):
-    with open(path, encoding="utf-8") as f:
+def load_users(path=None):
+    users_path = path or os.environ.get("IDENTITY_USERS_FILE", "users.json")
+    if not os.path.isabs(users_path):
+        users_path = os.path.join(BASE_DIR, users_path)
+    with open(users_path, encoding="utf-8") as f:
         return {u["usuario"]: u for u in json.load(f)}
 
 # Hasheo de contraseña
@@ -97,6 +102,9 @@ def main():
     else:
         port     = int(os.environ.get("IDENTITY_PORT", 9090))
         log_path = os.environ.get("IDENTITY_LOG", "identity.log")
+
+    if not os.path.isabs(log_path):
+        log_path = os.path.join(BASE_DIR, log_path)
 
     setup_logging(log_path)
     logging.info(f"Iniciando Servicio de Identidad | puerto={port} | log={log_path}")

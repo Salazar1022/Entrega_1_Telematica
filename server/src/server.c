@@ -51,8 +51,10 @@
 #include <unistd.h>      /* close, read         */
 #include <signal.h>      /* signal, SIGINT      */
 #include <pthread.h>     /* pthread_create, etc.*/
-#include <errno.h>       /* errno               */
+#include <errno.h>       /* errno, EAGAIN       */
+#include <time.h>        /* time                */
 #include <sys/socket.h>
+#include <sys/time.h>    /* struct timeval      */
 #include <netinet/in.h>
 
 #include "../include/logger.h"
@@ -63,6 +65,10 @@
 /* ── Variable global para el señal handler ───────────────────────────────── */
 static volatile int server_running = 1;
 static int          server_fd      = -1;
+
+/* Configuraci\u00f3n de timeouts leida de variables de entorno (RFC_v2) */
+static int idle_timeout_secs = IDLE_TIMEOUT_DEF;  /* default: 600 s */
+static int game_timeout_secs = GAME_TIMEOUT;       /* default: 600 s */
 
 /* ══════════════════════════════════════════════════════════════════════════
  * HILO DE CLIENTE — se ejecuta uno por cada conexión aceptada
@@ -112,6 +118,17 @@ static void *client_thread(void *arg) {
 
     free(cargs);  /* Ya copiamos los datos que necesitábamos */
 
+    /*
+     * Configurar SO_RCVTIMEO para detectar inactividad (RFC_v2).
+     * Si el cliente no envía nada en `idle_timeout_secs` segundos,
+     * read() retorna -1 con errno == EAGAIN o EWOULDBLOCK.
+     */
+    struct timeval tv;
+    tv.tv_sec  = idle_timeout_secs;
+    tv.tv_usec = 0;
+    setsockopt(player->socket_fd, SOL_SOCKET, SO_RCVTIMEO,
+               (const char *)&tv, sizeof(tv));
+
     /* Log de nueva conexión */
     char connect_msg[128];
     snprintf(connect_msg, sizeof(connect_msg),
@@ -120,7 +137,7 @@ static void *client_thread(void *arg) {
 
     /* Enviar mensaje de bienvenida */
     const char *welcome =
-        "OK Bienvenido al servidor CyberGame (CGSP v1.0). Usa AUTH <usuario> <password>\n";
+        "OK Bienvenido al servidor CyberGame (CGSP v2.0). Usa AUTH <usuario> <password>\n";
     write(player->socket_fd, welcome, strlen(welcome));
 
     /*
@@ -144,12 +161,21 @@ static void *client_thread(void *arg) {
 
         if (bytes_received <= 0) {
             /*
-             * bytes_received == 0 → EOF (cliente cerró la conexión ordenadamente)
-             * bytes_received < 0  → error (conexión abortada, red caída, etc.)
+             * bytes_received == 0 → EOF (cliente cerró la conexión)
+             * bytes_received <  0 → error o TIMEOUT de inactividad (RFC_v2)
              */
             if (bytes_received < 0) {
-                log_event(LOG_WARN, player->client_ip, player->client_port,
-                          "Error de lectura — conexion perdida abruptamente");
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    /* Idle timeout: enviar ERR 408 y cerrar hilo */
+                    const char *tmsg =
+                        "ERR 408 Timeout: conexion cerrada por inactividad\n";
+                    write(player->socket_fd, tmsg, strlen(tmsg));
+                    log_event(LOG_WARN, player->client_ip, player->client_port,
+                              "ERR 408: cliente inactivo — conexion cerrada");
+                } else {
+                    log_event(LOG_WARN, player->client_ip, player->client_port,
+                              "Error de lectura — conexion perdida abruptamente");
+                }
             } else {
                 log_event(LOG_INFO, player->client_ip, player->client_port,
                           "Cliente cerro la conexion (EOF)");
@@ -225,9 +251,20 @@ static void signal_handler(int sig) {
     (void)sig;  /* Suprimir warning de "parámetro no usado" */
     printf("\n[SERVER] Señal recibida. Cerrando servidor...\n");
     server_running = 0;
-    /* Cerrar el socket del servidor hace que accept() retorne con error
-     * y el loop principal pueda detectar que debe terminar */
     if (server_fd >= 0) close(server_fd);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * HILO DE TIMERS — verifica cada segundo los timers de ataque y de partida
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+static void *timer_thread(void *arg) {
+    (void)arg;
+    while (server_running) {
+        sleep(1);  /* Verificar cada segundo */
+        room_check_timers(game_timeout_secs);
+    }
+    return NULL;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -254,9 +291,20 @@ int main(int argc, char *argv[]) {
     const char *log_file = argv[2];
 
     /*
+     * Leer timeouts desde variables de entorno (RFC_v2).
+     * Permet configurar sin recompilar.
+     */
+    const char *env_idle = getenv("CGSP_IDLE_TIMEOUT");
+    if (env_idle != NULL && atoi(env_idle) > 0) {
+        idle_timeout_secs = atoi(env_idle);
+    }
+    const char *env_game = getenv("CGSP_GAME_TIMEOUT");
+    if (env_game != NULL && atoi(env_game) > 0) {
+        game_timeout_secs = atoi(env_game);
+    }
+
+    /*
      * PASO 2: Inicializar el sistema de logging.
-     * Debe ser lo primero que hacemos para que todos los módulos
-     * puedan escribir logs desde el inicio.
      */
     if (logger_init(log_file) != 0) {
         fprintf(stderr, "ERROR: No se pudo inicializar el logger con archivo '%s'\n",
@@ -264,25 +312,38 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    log_event(LOG_INFO, NULL, 0, "=== Servidor CyberGame CGSP v1.0 iniciando ===");
+    log_event(LOG_INFO, NULL, 0, "=== Servidor CyberGame CGSP v2.0 iniciando ===");
+
+    char cfg_msg[256];
+    snprintf(cfg_msg, sizeof(cfg_msg),
+             "Configuracion: idle_timeout=%ds  game_timeout=%ds",
+             idle_timeout_secs, game_timeout_secs);
+    log_event(LOG_INFO, NULL, 0, cfg_msg);
+    printf("[SERVER] %s\n", cfg_msg);
 
     /* PASO 3: Capturar Ctrl+C para cierre limpio */
     signal(SIGINT,  signal_handler);
     signal(SIGTERM, signal_handler);
 
     /*
-     * Ignorar SIGPIPE.
-     * Cuando el cliente se desconecta abruptamente y nosotros intentamos
-     * escribirle, el SO envía SIGPIPE a nuestro proceso. Por defecto,
-     * SIGPIPE termina el programa. Lo ignoramos para manejar el error
-     * limpiamente con el valor de retorno de write().
+     * Ignorar SIGPIPE — cuando el cliente se desconecta abruptamente
+     * y write() intentaría escribirle.
      */
     signal(SIGPIPE, SIG_IGN);
 
     /* PASO 4: Inicializar el sistema de juego */
     game_init();
 
-    /* PASO 5: Crear el socket del servidor */
+    /* PASO 5: Lanzar hilo de timers (ATTACK_TIMEOUT + GAME_TIMEOUT) */
+    pthread_t timer_tid;
+    if (pthread_create(&timer_tid, NULL, timer_thread, NULL) == 0) {
+        pthread_detach(timer_tid);
+        log_event(LOG_INFO, NULL, 0, "Hilo de timers iniciado");
+    } else {
+        log_event(LOG_WARN, NULL, 0, "No se pudo crear hilo de timers");
+    }
+
+    /* PASO 6: Crear el socket del servidor */
     server_fd = create_server_socket(port);
     if (server_fd < 0) {
         log_event(LOG_ERROR, NULL, 0, "No se pudo crear el socket del servidor. Abortando.");

@@ -1,6 +1,13 @@
 # Entrega_1_Telematica — CyberGame (CGSP)
 
-Simulador multijugador de ciberseguridad sobre protocolo TCP propio (**CGSP v1.0**).
+Simulador multijugador de ciberseguridad sobre protocolo TCP propio (**CGSP v2.0**).
+
+## Cierre de Entregable
+
+- Checklist de cumplimiento final: `Documentacion/checklist_entregable_final.md`
+- Guía de despliegue en nube (AWS): `Documentacion/despliegue_nube_aws.md`
+- Especificación canónica del protocolo: `Documentacion/RFC_v2.tex`
+- Nota: archivos `RFC_CGSP.*` y `rfc.tex` se conservan como histórico de versión previa.
 
 ---
 
@@ -31,8 +38,8 @@ cd Entrega_1_Telematica
 
 **Terminal 1 — Servicio de Identidad:**
 ```powershell
-cd server
-python identity_stub.py 9090
+cd Protocol_ServiceID
+python identity_server.py 9090 identity.log
 ```
 
 **Terminal 2 — Servidor CGSP (C) via WSL/Linux:**
@@ -40,6 +47,7 @@ python identity_stub.py 9090
 cd server
 export IDENTITY_HOST=localhost
 export IDENTITY_PORT=9090
+export CGSP_IDLE_TIMEOUT=900   # opcional: permite 15 min de inactividad
 make run          # compila y ejecuta en puerto 8081
 ```
 
@@ -76,7 +84,7 @@ Abre `http://127.0.0.1:8080` en el navegador.
 2. En el lobby → crear una sala o unirse a una existente
 3. Abrir otra sesión del lobby → hacer login con un usuario defensor → unirse a la misma sala
 4. Lanzar los clientes desktop (ver abajo)
-5. Una vez que ambos jugadores están en la sala, la partida inicia automáticamente
+5. Una vez que ambos jugadores están en la sala, inicia manualmente con `START` desde el cliente atacante (tecla `T`)
 
 ---
 
@@ -93,7 +101,16 @@ $env:CGSP_ROOM = "1"
 python cliente_web_y_juego\cliente_atacante\cliente_atacante.py
 ```
 
-**Controles:** `W/A/S/D` (mover) · `V` (SCAN) · `X` (ATTACK 0)
+```powershell
+$env:CGSP_HOST = "localhost"
+$env:CGSP_PORT = "8081"
+$env:CGSP_USER = "hacker"
+$env:CGSP_PASS = "hack2026"
+$env:CGSP_ROOM = "1"
+python cliente_web_y_juego\cliente_atacante\cliente_atacante.py
+```
+
+**Controles:** `W/A/S/D` (mover) · `V` (SCAN) · `X` (ATTACK 0) · `T` (START manual)
 
 ### Cliente Defensor (Java / Swing)
 
@@ -102,6 +119,17 @@ $env:CGSP_HOST = "localhost"
 $env:CGSP_PORT = "8081"
 $env:CGSP_USER = "defensor1"
 $env:CGSP_PASS = "pass123"
+$env:CGSP_ROOM = "1"
+cd cliente_web_y_juego\cliente_defensor
+javac ClienteDefensor.java
+java ClienteDefensor
+```
+
+```powershell
+$env:CGSP_HOST = "localhost"
+$env:CGSP_PORT = "8081"
+$env:CGSP_USER = "seguridad"
+$env:CGSP_PASS = "seg2026"
 $env:CGSP_ROOM = "1"
 cd cliente_web_y_juego\cliente_defensor
 javac ClienteDefensor.java
@@ -138,14 +166,15 @@ ROLE <ATTACKER|DEFENDER>
 ERR <code> <descripcion>
 ROOM_CREATED <room_id>
 ROOM_LIST <n>
-ROOM <id> <WAITING|RUNNING|FINISHED> <players>/<max>
+ROOM <id> <WAITING|RUNNING|FINISHED> <atacantes>/<defensores>/<max>
 EVENT PLAYER_JOINED <usuario> <rol>
 EVENT PLAYER_LEFT <usuario>
 EVENT GAME_STARTED
 EVENT RESOURCE_INFO <id> <x> <y>       ← solo defensores
-EVENT RESOURCE_FOUND <id> <x> <y>      ← solo atacantes (via SCAN)
+EVENT RESOURCE_FOUND <id> <x> <y>      ← atacantes de la sala (via SCAN)
 EVENT ATTACK <resource_id> <atacante>
 EVENT DEFENDED <resource_id> <defensor>
+EVENT ATTACK_TIMEOUT <resource_id>
 EVENT GAME_OVER <ATTACKER|DEFENDER>
 ```
 
@@ -157,6 +186,8 @@ EVENT GAME_OVER <ATTACKER|DEFENDER>
 |----------------|-------------|-------------|
 | `IDENTITY_HOST`| `localhost` | Host del servicio de identidad |
 | `IDENTITY_PORT`| `9090`      | Puerto del servicio de identidad |
+| `IDENTITY_IDLE_TIMEOUT` | `120` | Timeout de inactividad del servicio de identidad (segundos) |
+| `IDENTITY_USERS_FILE` | `users.json` | Archivo JSON de usuarios para el servicio de identidad |
 | `GAME_HOST`    | `localhost` | Host del servidor CGSP (usado por HTTP server) |
 | `GAME_PORT`    | `8081`      | Puerto del servidor CGSP |
 | `CGSP_HOST`    | `localhost` | Host del servidor CGSP (usado por clientes) |
@@ -164,6 +195,8 @@ EVENT GAME_OVER <ATTACKER|DEFENDER>
 | `CGSP_USER`    | `atacante1` | Usuario para autenticación en clientes |
 | `CGSP_PASS`    | `pass123`   | Contraseña para autenticación en clientes |
 | `CGSP_ROOM`    | `1`         | Sala a la que se une el cliente automáticamente |
+| `CGSP_IDLE_TIMEOUT` | `600`   | Timeout de inactividad de cliente en el servidor (segundos) |
+| `CGSP_GAME_TIMEOUT` | `600`   | Tiempo máximo de partida antes de victoria defensora (segundos) |
 | `HTTP_HOST`    | `127.0.0.1` | Interfaz en la que escucha el servidor HTTP |
 | `HTTP_PORT`    | `8080`      | Puerto del servidor HTTP |
 
@@ -175,11 +208,11 @@ EVENT GAME_OVER <ATTACKER|DEFENDER>
 Entrega_1_Telematica/
 ├── start_all.ps1                     ← Script de inicio rápido (Windows)
 ├── README.md
-├── RFC_CGSP.md / RFC_CGSP.tex        ← Especificación del protocolo
+├── Documentacion/RFC_v2.tex          ← Especificación base del protocolo (v2)
 │
 ├── server/                           ← Servidor principal (C)
 │   ├── Makefile
-│   ├── identity_stub.py              ← Servicio de identidad (Python stub)
+│   ├── identity_stub.py              ← Stub legacy (opcional para pruebas)
 │   ├── server.log                    ← Archivo de logs (generado al ejecutar)
 │   ├── include/
 │   │   ├── game_logic.h
@@ -194,6 +227,12 @@ Entrega_1_Telematica/
 │       ├── identity.c                ← cliente del servicio de identidad
 │       ├── logger.c                  ← logging thread-safe
 │       └── net_utils.c               ← herramientas de red y DNS
+│
+├── Protocol_ServiceID/               ← Servicio de identidad principal (Python)
+│   ├── identity_server.py            ← Auth por AUTH_CHECK + roles
+│   ├── users.json                    ← Base de usuarios (password_hash SHA-256)
+│   ├── generate_users.py             ← Alta de usuarios para users.json
+│   └── identity.log                  ← Log del servicio
 │
 └── cliente_web_y_juego/
     ├── servidor_http/                ← Servidor HTTP + Lobby web

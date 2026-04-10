@@ -1,6 +1,7 @@
 import hashlib, json, os, getpass
 
-USERS_FILE = "users.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+USERS_FILE = os.path.join(BASE_DIR, "users.json")
 
 def hash_password(pw):
     return hashlib.sha256(pw.encode()).hexdigest()

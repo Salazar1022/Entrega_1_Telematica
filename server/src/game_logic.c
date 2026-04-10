@@ -160,12 +160,13 @@ int room_list(char *out, int out_size) {
             default:            state_str = "UNKNOWN";  break;
         }
 
-        /* Formato: "ROOM <id> <estado> <jugadores>/<max>\n" */
+        /* Formato v2: "ROOM <id> <estado> <atacantes>/<defensores>/<max>\n" */
         offset += snprintf(out + offset, out_size - offset,
-                           "ROOM %d %s %d/%d\n",
+                           "ROOM %d %s %d/%d/%d\n",
                            rooms[i].id,
                            state_str,
-                           rooms[i].player_count,
+                           rooms[i].attacker_count,
+                           rooms[i].defender_count,
                            MAX_PLAYERS);
         count++;
     }
@@ -274,6 +275,8 @@ int room_try_start(int room_id) {
     }
 
     room->state = ROOM_RUNNING;
+    room->game_start_time = time(NULL);  /* Marcar inicio para GAME_TIMEOUT */
+    room->game_timeout    = GAME_TIMEOUT;
 
     char log_msg[64];
     snprintf(log_msg, sizeof(log_msg), "¡Sala %d iniciada!", room_id);
@@ -517,6 +520,35 @@ void room_broadcast(int room_id, const char *message, Player *exclude) {
     pthread_mutex_unlock(&rooms_mutex);
 }
 
+/* ──  room_broadcast_role() ──────────────────────────────────────────────── */
+/*
+ * Igual que room_broadcast() pero solo envía a jugadores con el rol dado.
+ * Uso: difundir resultado de SCAN solo a los demás atacantes de la sala,
+ * de modo que todos los atacantes vean los mismos recursos descubiertos.
+ */
+void room_broadcast_role(int room_id, const char *message,
+                         Player *exclude, PlayerRole role) {
+    pthread_mutex_lock(&rooms_mutex);
+
+    Room *room = NULL;
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        if (rooms[i].id == room_id) {
+            room = &rooms[i]; break;
+        }
+    }
+
+    if (room != NULL) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            if (room->players[i] == NULL)          continue;
+            if (room->players[i] == exclude)        continue;  /* emisor excluido */
+            if (room->players[i]->role != role)     continue;  /* solo el rol pedido */
+            send_msg(room->players[i]->socket_fd, message);
+        }
+    }
+
+    pthread_mutex_unlock(&rooms_mutex);
+}
+
 /* ── room_remove_player() ────────────────────────────────────────────────── */
 
 void room_remove_player(Player *player) {
@@ -552,5 +584,86 @@ void room_remove_player(Player *player) {
 
     player->in_room = 0;
     player->room_id = -1;
+    pthread_mutex_unlock(&rooms_mutex);
+}
+
+/* ──  room_check_timers() ──────────────────────────────────────────────────────── */
+
+/*
+ * Revisa TODOS los timers activos:
+ *  1. Si un recurso lleva más de ATTACK_TIMEOUT segundos bajo ataque sin
+ *     ser defendido → emite EVENT ATTACK_TIMEOUT <id> + EVENT GAME_OVER ATTACKER.
+ *  2. Si una sala RUNNING lleva más de game_timeout segundos activa
+ *     → emite EVENT GAME_OVER DEFENDER (defensa exitosa por tiempo).
+ *
+ * Esta función se llama desde un hilo dedicado cada segundo.
+ */
+void room_check_timers(int game_timeout_secs) {
+    time_t now = time(NULL);
+
+    pthread_mutex_lock(&rooms_mutex);
+
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        Room *room = &rooms[i];
+        if (room->id == 0 || room->state != ROOM_RUNNING) continue;
+
+        /* ── 1. Timer global de partida (GAME_TIMEOUT) ──────────────── */
+        int max_secs = (room->game_timeout > 0) ? room->game_timeout : game_timeout_secs;
+        if (room->game_start_time > 0 &&
+            (now - room->game_start_time) >= max_secs) {
+
+            room->state = ROOM_FINISHED;
+            pthread_mutex_unlock(&rooms_mutex);
+
+            /* Victoria defensora: tiempo agotado */
+            char log_msg[128];
+            snprintf(log_msg, sizeof(log_msg),
+                     "Sala %d: GAME_TIMEOUT — victoria DEFENDER", room->id);
+            log_event(LOG_INFO, NULL, 0, log_msg);
+
+            room_broadcast(room->id, "EVENT GAME_OVER DEFENDER\n", NULL);
+
+            pthread_mutex_lock(&rooms_mutex);
+            continue;  /* Pasar a la siguiente sala */
+        }
+
+        /* ── 2. Timer de ataque por recurso (ATTACK_TIMEOUT) ────────── */
+        for (int r = 0; r < NUM_RESOURCES; r++) {
+            Resource *res = &room->resources[r];
+            if (!res->under_attack) continue;
+
+            double elapsed = difftime(now, res->attack_time);
+            if (elapsed < ATTACK_TIMEOUT) continue;
+
+            /* Timer expirado: el atacante gana este recurso */
+            int room_id  = room->id;
+            int res_id   = res->id;
+
+            /* Marcar recurso como "comprometido" (no bajo ataque activo,
+             * pero la sala termina) */
+            res->under_attack = 0;
+            room->state       = ROOM_FINISHED;
+
+            pthread_mutex_unlock(&rooms_mutex);
+
+            /* Emitir EVENT ATTACK_TIMEOUT ANTES de GAME_OVER (RFC_v2) */
+            char timeout_msg[64];
+            snprintf(timeout_msg, sizeof(timeout_msg),
+                     "EVENT ATTACK_TIMEOUT %d\n", res_id);
+            room_broadcast(room_id, timeout_msg, NULL);
+
+            room_broadcast(room_id, "EVENT GAME_OVER ATTACKER\n", NULL);
+
+            char log_msg[128];
+            snprintf(log_msg, sizeof(log_msg),
+                     "Sala %d: ATTACK_TIMEOUT en recurso %d — victoria ATTACKER",
+                     room_id, res_id);
+            log_event(LOG_WARN, NULL, 0, log_msg);
+
+            pthread_mutex_lock(&rooms_mutex);
+            break;  /* Una sala solo puede tener un timer expirando a la vez */
+        }
+    }
+
     pthread_mutex_unlock(&rooms_mutex);
 }
