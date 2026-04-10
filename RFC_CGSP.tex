@@ -1,0 +1,887 @@
+\documentclass[12pt, letterpaper]{article}
+
+% ── Paquetes ──────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usepackage{float}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{mdframed}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+
+% ── Geometría de página ───────────────────────────────────────────────────────
+\geometry{
+    top=2.5cm,
+    bottom=2.5cm,
+    left=3cm,
+    right=3cm
+}
+
+% ── Colores ───────────────────────────────────────────────────────────────────
+\definecolor{cgsp-blue}{RGB}{15, 76, 129}
+\definecolor{cgsp-gray}{RGB}{240, 242, 245}
+\definecolor{cgsp-green}{RGB}{39, 174, 96}
+\definecolor{cgsp-red}{RGB}{192, 57, 43}
+\definecolor{cgsp-orange}{RGB}{211, 84, 0}
+\definecolor{code-bg}{RGB}{248, 249, 250}
+\definecolor{code-comment}{RGB}{106, 153, 85}
+\definecolor{code-keyword}{RGB}{86, 156, 214}
+\definecolor{code-string}{RGB}{206, 145, 120}
+
+% ── Estilo de listings (bloques de código) ────────────────────────────────────
+\lstdefinestyle{cgsp-proto}{
+    backgroundcolor=\color{code-bg},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    breakatwhitespace=false,
+    frame=single,
+    framesep=4pt,
+    rulecolor=\color{cgsp-blue!40},
+    xleftmargin=8pt,
+    xrightmargin=8pt,
+    showstringspaces=false,
+    tabsize=2,
+    commentstyle=\color{code-comment},
+    keywordstyle=\color{code-keyword}\bfseries,
+    stringstyle=\color{code-string},
+    numbers=none,
+    captionpos=b,
+    keepspaces=true
+}
+
+\lstset{style=cgsp-proto}
+
+% ── Encabezado y pie de página ────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{cgsp-blue}{\textbf{RFC-CGSP-1}}}
+\fancyhead[C]{\small CyberGame Socket Protocol v1.0}
+\fancyhead[R]{\small Abril 2026}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{cgsp-blue}\leaders\hrule height \headrulewidth\hfill}}
+
+% ── Títulos de sección ────────────────────────────────────────────────────────
+\titleformat{\section}
+    {\large\bfseries\color{cgsp-blue}}
+    {\thesection.}{0.5em}{}[\titlerule]
+
+\titleformat{\subsection}
+    {\normalsize\bfseries\color{cgsp-blue!80}}
+    {\thesubsection.}{0.5em}{}
+
+\titleformat{\subsubsection}
+    {\normalsize\bfseries\color{cgsp-blue!60}}
+    {\thesubsubsection.}{0.5em}{}
+
+% ── Cuadro de nota ────────────────────────────────────────────────────────────
+\newmdenv[
+    backgroundcolor=cgsp-gray,
+    linecolor=cgsp-blue,
+    linewidth=2pt,
+    leftline=true,
+    rightline=false,
+    topline=false,
+    bottomline=false,
+    innerleftmargin=10pt,
+    innerrightmargin=10pt,
+    innertopmargin=6pt,
+    innerbottommargin=6pt
+]{nota}
+
+% ── Hipervínculos ─────────────────────────────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=cgsp-blue,
+    urlcolor=cgsp-blue,
+    citecolor=cgsp-blue
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+%  DOCUMENTO
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ── Portada ───────────────────────────────────────────────────────────────────
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+
+    {\small\texttt{Especificación de Protocolo}}\\[0.3cm]
+    {\Huge\bfseries\color{cgsp-blue} RFC-CGSP-1}\\[0.5cm]
+    {\large\bfseries CyberGame Socket Protocol (CGSP)}\\[0.2cm]
+    {\large Versión 1.0}
+
+    \vspace{1.5cm}
+    \rule{\textwidth}{1pt}\\[0.4cm]
+    {\normalsize
+        \begin{tabular}{ll}
+            \textbf{Estado:}   & Propuesto \\[4pt]
+            \textbf{Fecha:}    & Abril 2026 \\[4pt]
+            \textbf{Materia:}  & Internet: Arquitectura y Protocolos --- 2026-1 \\[4pt]
+            \textbf{Autores:}  & Equipo Entrega\_1\_Telematica
+        \end{tabular}
+    }\\[0.4cm]
+    \rule{\textwidth}{1pt}
+
+    \vspace{1.5cm}
+    \begin{mdframed}[backgroundcolor=cgsp-gray, linecolor=cgsp-blue, linewidth=1pt]
+        \textbf{Abstract.} Este documento especifica el \textit{CyberGame Socket Protocol
+        (CGSP)}, un protocolo de la capa de aplicación diseñado para soportar la
+        comunicación en tiempo real entre clientes y el servidor central de un simulador
+        interactivo multijugador de ciberseguridad. El protocolo define el formato de
+        mensajes, el vocabulario de comandos, las reglas de procedimiento y el manejo de
+        errores para una partida en la que jugadores con roles de ``Atacante'' o
+        ``Defensor'' interactúan sobre un plano virtual compartido.
+    \end{mdframed}
+
+    \vfill
+    {\small Universidad EAFIT --- Departamento de Ingeniería de Sistemas}
+\end{titlepage}
+
+% ── Tabla de contenidos ───────────────────────────────────────────────────────
+\tableofcontents
+\newpage
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Visión General del Protocolo}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\subsection{Propósito}
+
+CGSP permite que múltiples jugadores interactúen simultáneamente con un servidor de
+juego central. A través de este protocolo, los jugadores pueden:
+
+\begin{itemize}[leftmargin=2em]
+    \item Autenticarse en el sistema mediante un servicio de identidad externo.
+    \item Listar y unirse a salas de juego activas.
+    \item Moverse por un plano virtual bidimensional.
+    \item Ejecutar acciones específicas de su rol (atacar o defender recursos críticos).
+    \item Recibir notificaciones de eventos del sistema en tiempo real.
+\end{itemize}
+
+\subsection{Modelo de Funcionamiento}
+
+CGSP adopta el modelo \textbf{cliente-servidor} con comunicación \textbf{bidireccional
+persistente}. El siguiente diagrama ilustra la arquitectura del sistema:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=3.5cm,
+    box/.style={rectangle, draw=cgsp-blue, fill=cgsp-gray, rounded corners=4pt,
+                minimum width=3cm, minimum height=1cm, align=center, font=\small},
+    arrow/.style={-{Stealth[length=6pt]}, thick, color=cgsp-blue}
+]
+    \node[box] (cliente) {Cliente\\(Jugador)};
+    \node[box, right=of cliente] (servidor) {Servidor\\Central (C)};
+    \node[box, right=of servidor] (identity) {Servicio de\\Identidad};
+
+    \draw[arrow] ([yshift=3pt]cliente.east) -- ([yshift=3pt]servidor.west)
+        node[midway, above, font=\tiny] {TCP persistente};
+    \draw[arrow] ([yshift=-3pt]servidor.west) -- ([yshift=-3pt]cliente.east)
+        node[midway, below, font=\tiny] {CGSP texto/\textbackslash{}n};
+
+    \draw[arrow] ([yshift=3pt]servidor.east) -- ([yshift=3pt]identity.west)
+        node[midway, above, font=\tiny] {TCP req/resp};
+    \draw[arrow] ([yshift=-3pt]identity.west) -- ([yshift=-3pt]servidor.east)
+        node[midway, below, font=\tiny] {OK ROLE / ERR};
+\end{tikzpicture}
+\caption{Arquitectura del sistema CGSP}
+\end{figure}
+
+El servidor acepta conexiones TCP entrantes y crea un hilo POSIX (\texttt{pthread})
+dedicado por cada cliente. La conexión se mantiene activa durante toda la sesión del
+jugador. El servidor también actúa como cliente frente al Servicio de Identidad para
+autenticar usuarios.
+
+\subsection{Capa de la Arquitectura TCP/IP}
+
+CGSP opera en la \textbf{capa de aplicación} del modelo TCP/IP:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{>{\bfseries}l l}
+\toprule
+Capa & Protocolo \\
+\midrule
+Aplicación  & \textbf{CGSP v1.0} (este documento) \\
+Transporte  & TCP (SOCK\_STREAM) \\
+Red         & IPv4 \\
+Enlace      & Ethernet / Wi-Fi \\
+\bottomrule
+\end{tabular}
+\caption{Pila de protocolos de CGSP}
+\end{table}
+
+\begin{nota}
+\textbf{Justificación de TCP sobre UDP.} El juego requiere confiabilidad absoluta en
+la entrega de mensajes. Un paquete de \texttt{ATTACK} o \texttt{DEFEND} que se
+pierda comprometería la consistencia del estado del juego entre servidor y clientes.
+TCP garantiza entrega ordenada, detección de pérdidas y retransmisión automática.
+UDP sería adecuado solo para actualizaciones de posición de alta frecuencia donde
+una pérdida es aceptable --- lo cual no aplica a este diseño.
+\end{nota}
+
+\subsection{Resolución de Nombres}
+
+CGSP prohíbe el uso de direcciones IP codificadas (\textit{hardcoded}) en el
+software. Toda referencia a servicios externos (servidor de juego, servicio de
+identidad) se resuelve mediante DNS usando la función \texttt{getaddrinfo()} de
+POSIX. Si la resolución falla, el servicio maneja la excepción sin finalizar su
+ejecución, respondiendo al cliente con \texttt{ERR 503}.
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Especificación del Servicio}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\subsection{Primitivas del Servicio}
+
+Las primitivas de CGSP se organizan según el estado del cliente en el servidor.
+
+\subsubsection{Estado: CONECTADO (antes de autenticarse)}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Primitiva} & \textbf{Dirección} & \textbf{Descripción} \\
+\midrule
+\texttt{AUTH} & Cliente $\rightarrow$ Servidor & Autenticar un usuario contra el servicio de identidad \\
+\texttt{QUIT} & Cliente $\rightarrow$ Servidor & Cerrar la conexión ordenadamente \\
+\bottomrule
+\end{tabularx}
+\caption{Primitivas disponibles en estado CONECTADO}
+\end{table}
+
+\subsubsection{Estado: AUTENTICADO}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Primitiva} & \textbf{Dirección} & \textbf{Descripción} \\
+\midrule
+\texttt{LIST\_ROOMS}  & Cliente $\rightarrow$ Servidor & Obtener lista de salas activas \\
+\texttt{CREATE\_ROOM} & Cliente $\rightarrow$ Servidor & Crear una nueva sala de juego \\
+\texttt{JOIN}         & Cliente $\rightarrow$ Servidor & Unirse a una sala existente \\
+\texttt{STATUS}       & Cliente $\rightarrow$ Servidor & Consultar estado actual del jugador \\
+\texttt{QUIT}         & Cliente $\rightarrow$ Servidor & Cerrar la conexión \\
+\bottomrule
+\end{tabularx}
+\caption{Primitivas disponibles en estado AUTENTICADO}
+\end{table}
+
+\subsubsection{Estado: EN PARTIDA}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l l X}
+\toprule
+\textbf{Primitiva} & \textbf{Dirección} & \textbf{Rol} & \textbf{Descripción} \\
+\midrule
+\texttt{MOVE}   & C $\rightarrow$ S & Ambos    & Mover al jugador en el plano \\
+\texttt{SCAN}   & C $\rightarrow$ S & ATTACKER & Detectar recursos críticos cercanos \\
+\texttt{ATTACK} & C $\rightarrow$ S & ATTACKER & Lanzar un ataque sobre un recurso \\
+\texttt{DEFEND} & C $\rightarrow$ S & DEFENDER & Mitigar un ataque activo \\
+\texttt{START}  & C $\rightarrow$ S & Ambos    & Intentar iniciar la partida \\
+\texttt{STATUS} & C $\rightarrow$ S & Ambos    & Consultar estado del jugador/sala \\
+\texttt{QUIT}   & C $\rightarrow$ S & Ambos    & Abandonar la partida \\
+\bottomrule
+\end{tabularx}
+\caption{Primitivas disponibles EN PARTIDA}
+\end{table}
+
+\subsubsection{Mensajes Asíncronos del Servidor}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Evento} & \textbf{Receptores} & \textbf{Descripción} \\
+\midrule
+\texttt{EVENT PLAYER\_JOINED}  & Sala completa    & Un nuevo jugador se unió a la sala \\
+\texttt{EVENT PLAYER\_LEFT}    & Sala completa    & Un jugador abandonó la sala \\
+\texttt{EVENT GAME\_STARTED}   & Sala completa    & La partida comenzó \\
+\texttt{EVENT RESOURCE\_INFO}  & Solo defensores  & Coordenadas de recursos críticos (al iniciar) \\
+\texttt{EVENT RESOURCE\_FOUND} & Solo atacante    & Recurso detectado por SCAN \\
+\texttt{EVENT ATTACK}          & Sala completa    & Notificación de ataque activo \\
+\texttt{EVENT DEFENDED}        & Sala completa    & Recurso fue defendido exitosamente \\
+\texttt{EVENT GAME\_OVER}      & Sala completa    & Fin de partida con resultado \\
+\bottomrule
+\end{tabularx}
+\caption{Mensajes asíncronos del servidor (broadcast y unicast)}
+\end{table}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Formato de Mensajes}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\subsection{Codificación General}
+
+Todo mensaje CGSP debe cumplir las siguientes reglas de codificación:
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Codificación de caracteres:} UTF-8.
+    \item \textbf{Delimitador de mensaje:} \texttt{\textbackslash{}n} (LF, \texttt{0x0A}). Un mensaje por línea.
+    \item \textbf{Separador de campos:} espacio (\texttt{0x20}).
+    \item \textbf{Longitud máxima de mensaje:} 2\,048 bytes.
+    \item \textbf{Sensibilidad a mayúsculas en comandos:} NO (el servidor normaliza a mayúsculas).
+\end{itemize}
+
+\textbf{Estructura general:}
+\begin{lstlisting}
+COMANDO [PARAM1] [PARAM2] ... [PARAMn]\n
+\end{lstlisting}
+
+\subsection{Mensajes del Cliente hacia el Servidor}
+
+\subsubsection{AUTH --- Autenticación}
+
+\begin{lstlisting}
+AUTH <usuario> <password>\n
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l l X}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Máx.} & \textbf{Descripción} \\
+\midrule
+\texttt{usuario}  & string & 63 chars & Nombre de usuario registrado \\
+\texttt{password} & string & 63 chars & Contraseña del usuario \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Ejemplo:} \texttt{AUTH carlos hack2026}
+
+\subsubsection{LIST\_ROOMS --- Listar Salas}
+
+\begin{lstlisting}
+LIST_ROOMS\n
+\end{lstlisting}
+
+Sin parámetros. Solicita la lista de salas de juego activas.
+
+\subsubsection{CREATE\_ROOM --- Crear Sala}
+
+\begin{lstlisting}
+CREATE_ROOM\n
+\end{lstlisting}
+
+Sin parámetros. Crea una nueva sala de juego y coloca los recursos críticos en posiciones aleatorias del mapa.
+
+\subsubsection{JOIN --- Unirse a Sala}
+
+\begin{lstlisting}
+JOIN <room_id>\n
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\midrule
+\texttt{room\_id} & entero positivo & Identificador numérico de la sala \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Ejemplo:} \texttt{JOIN 42}
+
+\subsubsection{START --- Iniciar Partida}
+
+\begin{lstlisting}
+START\n
+\end{lstlisting}
+
+Solicita el inicio de la partida. Solo tiene efecto si hay al menos un atacante y un defensor en la sala.
+
+\subsubsection{MOVE --- Mover Jugador}
+
+\begin{lstlisting}
+MOVE <dx> <dy>\n
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l l X}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Rango} & \textbf{Descripción} \\
+\midrule
+\texttt{dx} & entero & {[}$-100$, $100${]} & Desplazamiento en el eje X \\
+\texttt{dy} & entero & {[}$-100$, $100${]} & Desplazamiento en el eje Y \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+El servidor clampea la posición resultante dentro del mapa $[0, 99] \times [0, 99]$. \\
+\textbf{Ejemplo:} \texttt{MOVE 5 -3}
+
+\subsubsection{SCAN --- Escanear Área}
+
+\begin{lstlisting}
+SCAN\n
+\end{lstlisting}
+
+Solo para jugadores con rol \texttt{ATTACKER}. Detecta recursos críticos en un radio de \textbf{5 unidades} alrededor de la posición actual del atacante. La detección se calcula con distancia euclidiana:
+\[
+    d = \sqrt{(x_\text{jugador} - x_\text{recurso})^2 + (y_\text{jugador} - y_\text{recurso})^2} \leq 5
+\]
+
+\subsubsection{ATTACK --- Atacar Recurso}
+
+\begin{lstlisting}
+ATTACK <resource_id>\n
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\midrule
+\texttt{resource\_id} & entero (0 ó 1) & Identificador del recurso crítico a atacar \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Ejemplo:} \texttt{ATTACK 0}
+
+\subsubsection{DEFEND --- Defender Recurso}
+
+\begin{lstlisting}
+DEFEND <resource_id>\n
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\midrule
+\texttt{resource\_id} & entero (0 ó 1) & Identificador del recurso a defender \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Ejemplo:} \texttt{DEFEND 0}
+
+\subsubsection{STATUS --- Consultar Estado}
+
+\begin{lstlisting}
+STATUS\n
+\end{lstlisting}
+
+\subsubsection{QUIT --- Cerrar Sesión}
+
+\begin{lstlisting}
+QUIT\n
+\end{lstlisting}
+
+\subsection{Mensajes del Servidor hacia el Cliente}
+
+\subsubsection{OK --- Operación Exitosa}
+
+\begin{lstlisting}
+OK <mensaje>\n
+\end{lstlisting}
+
+\textbf{Ejemplos:}
+\begin{lstlisting}
+OK Bienvenido carlos
+OK Posicion: 15 42
+OK Ataque lanzado
+OK Recurso defendido
+OK Hasta luego
+\end{lstlisting}
+
+\subsubsection{ROLE --- Rol Asignado}
+
+\begin{lstlisting}
+ROLE <ATTACKER|DEFENDER>\n
+\end{lstlisting}
+
+Enviado inmediatamente después de un \texttt{AUTH} exitoso.
+
+\subsubsection{ERR --- Error}
+
+\begin{lstlisting}
+ERR <codigo> <descripcion>\n
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Código} & \textbf{Nombre} & \textbf{Descripción} \\
+\midrule
+\texttt{400} & BAD\_REQUEST & Formato de mensaje inválido o parámetros faltantes \\
+\texttt{401} & UNAUTHORIZED & Autenticación fallida o acción sin autenticar previamente \\
+\texttt{403} & FORBIDDEN & El rol del jugador no permite esta acción \\
+\texttt{404} & NOT\_FOUND & Sala o recurso no encontrado \\
+\texttt{409} & CONFLICT & Conflicto de estado (sala llena, partida iniciada, recurso ya atacado) \\
+\texttt{500} & INTERNAL\_ERROR & Error interno del servidor \\
+\texttt{503} & SERVICE\_UNAVAILABLE & Servicio de identidad no disponible \\
+\bottomrule
+\end{tabularx}
+\caption{Tabla de códigos de error de CGSP}
+\end{table}
+
+\textbf{Ejemplos:}
+\begin{lstlisting}
+ERR 401 Credenciales incorrectas
+ERR 403 Solo los atacantes pueden usar ATTACK
+ERR 404 Sala no encontrada
+ERR 409 Recurso ya bajo ataque
+ERR 503 Servicio de identidad no disponible, intenta luego
+\end{lstlisting}
+
+\subsubsection{ROOM\_CREATED --- Sala Creada}
+
+\begin{lstlisting}
+ROOM_CREATED <room_id>\n
+\end{lstlisting}
+
+\textbf{Ejemplo:} \texttt{ROOM\_CREATED 7}
+
+\subsubsection{ROOM\_LIST --- Lista de Salas}
+
+\begin{lstlisting}
+ROOM_LIST <n>\n
+ROOM <id> <WAITING|RUNNING|FINISHED> <jugadores>/<max>\n
+...
+\end{lstlisting}
+
+\textbf{Ejemplo:}
+\begin{lstlisting}
+ROOM_LIST 2
+ROOM 1 WAITING 1/10
+ROOM 5 RUNNING 3/10
+\end{lstlisting}
+
+\subsubsection{Eventos del Servidor}
+
+\begin{lstlisting}
+EVENT PLAYER_JOINED <usuario> <ATTACKER|DEFENDER>\n
+EVENT PLAYER_LEFT <usuario>\n
+EVENT GAME_STARTED\n
+EVENT RESOURCE_INFO <id> <x> <y>\n
+EVENT RESOURCE_FOUND <id> <x> <y>\n
+EVENT ATTACK <resource_id> <atacante>\n
+EVENT DEFENDED <resource_id> <defensor>\n
+EVENT GAME_OVER <ATTACKER|DEFENDER>\n
+\end{lstlisting}
+
+\begin{nota}
+\textbf{Unicast vs.\ Broadcast.} Los eventos \texttt{RESOURCE\_INFO} se envían
+únicamente al jugador defensor que se acaba de conectar. Los eventos \texttt{RESOURCE\_FOUND}
+se envían únicamente al atacante que ejecutó el \texttt{SCAN}. Todos los demás
+eventos se difunden a todos los jugadores de la sala (\textit{broadcast}).
+\end{nota}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Reglas de Procedimiento (Flujo de Operación)}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\subsection{Máquina de Estados del Cliente}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=2.2cm,
+    state/.style={rectangle, draw=cgsp-blue, fill=cgsp-gray, rounded corners=6pt,
+                  minimum width=5cm, minimum height=1cm, align=center, font=\small\bfseries},
+    arrow/.style={-{Stealth[length=6pt]}, thick, color=cgsp-blue!70},
+    label/.style={font=\tiny, color=cgsp-blue!80, align=center}
+]
+    \node[state] (S1) {CONECTADO\\{\footnotesize AUTH, QUIT}};
+    \node[state, below=of S1] (S2) {AUTENTICADO\\{\footnotesize LIST\_ROOMS, CREATE\_ROOM, JOIN, STATUS, QUIT}};
+    \node[state, below=of S2] (S3) {EN SALA\\{\footnotesize START, STATUS, QUIT}};
+    \node[state, below=of S3] (S4) {EN PARTIDA\\{\footnotesize MOVE, SCAN/ATTACK, DEFEND, STATUS, QUIT}};
+
+    \draw[arrow] (S1) -- (S2)
+        node[midway, right, label] {AUTH exitoso\\$\rightarrow$ OK + ROLE};
+    \draw[arrow] (S2) -- (S3)
+        node[midway, right, label] {JOIN exitoso\\$\rightarrow$ OK};
+    \draw[arrow] (S3) -- (S4)
+        node[midway, right, label] {START ($\geq$1 ATC + $\geq$1 DEF)\\$\rightarrow$ GAME\_STARTED + RESOURCE\_INFO};
+\end{tikzpicture}
+\caption{Máquina de estados del cliente CGSP}
+\end{figure}
+
+\subsection{Ciclo de Vida de una Sala}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=3.5cm,
+    state/.style={rectangle, draw=cgsp-blue, fill=cgsp-gray, rounded corners=4pt,
+                  minimum width=2.8cm, minimum height=0.9cm, align=center, font=\small\bfseries},
+    arrow/.style={-{Stealth[length=6pt]}, thick, color=cgsp-blue!70}
+]
+    \node[state] (W) {WAITING};
+    \node[state, right=of W] (R) {RUNNING};
+    \node[state, right=of R] (F) {FINISHED};
+
+    \draw[arrow] (W) -- (R) node[midway, above, font=\tiny] {START exitoso};
+    \draw[arrow] (R) -- (F) node[midway, above, font=\tiny] {condición\\de victoria};
+\end{tikzpicture}
+\caption{Ciclo de vida de una sala de juego}
+\end{figure}
+
+\subsection{Flujo de Ataque y Defensa}
+
+\begin{lstlisting}
+ATACANTE          SERVIDOR             DEFENSOR(ES)
+   |                  |                     |
+   |-- ATTACK 0 ----->|                     |
+   |<- OK Ataque -----|                     |
+   |                  |-- EVENT ATTACK 0 -->|
+   |                  |                     |-- DEFEND 0 -->|
+   |                  |<-------------------- DEFEND 0 ------|
+   |                  |-- EVENT DEFENDED 0 maria ---------->|
+   |<- EVENT DEFENDED |                     |
+\end{lstlisting}
+
+\begin{nota}
+\textbf{Timer de ataque.} Un recurso bajo ataque que no sea defendido dentro de
+\textbf{30 segundos} constituye victoria para el equipo atacante.
+\end{nota}
+
+\subsection{Flujo de Exploración del Atacante}
+
+\begin{lstlisting}
+ATACANTE              SERVIDOR
+   |                     |
+   |-- MOVE 30 35 ------>|   pos = (30, 35)
+   |<- OK Posicion 30 35 |
+   |-- SCAN ------------>|   dist((30,35), recurso) <= 5 ?
+   |<- EVENT RESOURCE_FOUND 0 32 37    (si detecta)
+   |<- OK SCAN: no encontrado          (si no detecta)
+   |-- ATTACK 0 -------->|
+   |<- OK Ataque lanzado |
+\end{lstlisting}
+
+\subsection{Manejo de Errores y Excepciones}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{X X}
+\toprule
+\textbf{Situación} & \textbf{Respuesta del Servidor} \\
+\midrule
+Línea vacía o sin \texttt{\textbackslash{}n} & Ignorada silenciosamente \\
+Comando desconocido & \texttt{ERR 400 Comando desconocido} \\
+Parámetros faltantes & \texttt{ERR 400 Uso: CMD <params>} \\
+Acción sin autenticar & \texttt{ERR 401 Debes autenticarte primero} \\
+Rol incorrecto para acción & \texttt{ERR 403 Solo los [rol] pueden usar [CMD]} \\
+Sala inexistente & \texttt{ERR 404 Sala no encontrada} \\
+Recurso inexistente & \texttt{ERR 404 Recurso no encontrado} \\
+Sala llena o partida iniciada & \texttt{ERR 409 <descripción del conflicto>} \\
+Servicio de identidad caído & \texttt{ERR 503} --- servidor \textbf{no} finaliza \\
+Desconexión abrupta del cliente & \texttt{read()} retorna $\leq 0$ $\rightarrow$ cierre limpio del hilo \\
+AUTH con sesión ya activa & \texttt{ERR 403 Ya estas autenticado} \\
+JOIN cuando ya está en sala & \texttt{ERR 403 Ya estas en una sala} \\
+\bottomrule
+\end{tabularx}
+\caption{Tabla de manejo de excepciones del protocolo}
+\end{table}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Ejemplos de Implementación}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\subsection{Sesión Completa de un Atacante}
+
+\begin{lstlisting}
+# Conexion establecida
+S->C: OK Bienvenido al servidor CyberGame (CGSP v1.0). Usa AUTH
+
+# Autenticacion
+C->S: AUTH carlos hack2026
+S->C: OK Bienvenido carlos
+S->C: ROLE ATTACKER
+
+# Listar salas disponibles
+C->S: LIST_ROOMS
+S->C: ROOM_LIST 1
+S->C: ROOM 3 WAITING 1/10
+
+# Unirse a sala
+C->S: JOIN 3
+S->C: OK Te uniste a la sala
+
+# Iniciar partida
+C->S: START
+S->C: OK Partida iniciada
+S->C: EVENT GAME_STARTED
+
+# Explorar el mapa
+C->S: MOVE 30 35
+S->C: OK Posicion: 30 35
+
+C->S: SCAN
+S->C: EVENT RESOURCE_FOUND 0 32 37
+
+# Lanzar ataque
+C->S: ATTACK 0
+S->C: OK Ataque lanzado
+
+# Notificacion de defensa exitosa
+S->C: EVENT DEFENDED 0 maria
+
+C->S: QUIT
+S->C: OK Hasta luego
+\end{lstlisting}
+
+\subsection{Sesión Completa de un Defensor}
+
+\begin{lstlisting}
+C->S: AUTH maria seg2026
+S->C: OK Bienvenido maria
+S->C: ROLE DEFENDER
+
+C->S: JOIN 3
+S->C: OK Te uniste a la sala
+
+C->S: START
+S->C: EVENT GAME_STARTED
+S->C: EVENT RESOURCE_INFO 0 32 37    # conoce los recursos
+S->C: EVENT RESOURCE_INFO 1 75 82
+
+C->S: MOVE 32 37
+S->C: OK Posicion: 32 37
+
+# Alerta de ataque
+S->C: EVENT ATTACK 0 carlos
+
+C->S: DEFEND 0
+S->C: OK Recurso defendido
+
+C->S: QUIT
+S->C: OK Hasta luego
+\end{lstlisting}
+
+\subsection{Diagrama de Secuencia de una Partida Completa}
+
+\begin{lstlisting}
+Atacante        Servidor         Defensor
+   |               |                |
+   |-- AUTH ------>|<----- AUTH ----|
+   |<- OK/ROLE ----|---- OK/ROLE -->|
+   |               |                |
+   |-- CREATE_ROOM->|               |
+   |<- ROOM_CREATED|                |
+   |               |                |
+   |-- JOIN 5 ---->|<----- JOIN 5 --|
+   |<- OK ----------|----- OK ----->|
+   |               |                |
+   |-- START ------>|<----- START --|
+   |<- GAME_STARTED |-- GAME_STARTED>|
+   |                |-- RESOURCE_INFO>|
+   |               |                |
+   |-- MOVE/SCAN -->|               |
+   |<- FOUND -------|               |
+   |               |                |
+   |-- ATTACK 0 -->|-- EVENT ATTACK>|
+   |<- OK ---------|<--- DEFEND 0 --|
+   |<- DEFENDED ----|---- OK ------>|
+\end{lstlisting}
+
+\subsection{Prueba Manual con Telnet}
+
+Para verificar el protocolo sin necesidad de un cliente completo:
+
+\begin{lstlisting}[language=bash]
+# Terminal 1: Iniciar el servicio de identidad stub
+python3 server/identity_stub.py 9090
+
+# Terminal 2: Iniciar el servidor de juego
+export IDENTITY_HOST=localhost
+export IDENTITY_PORT=9090
+cd server && ./server 8080 server.log
+
+# Terminal 3: Conectar como atacante
+telnet localhost 8080
+
+# Terminal 4: Conectar como defensor
+telnet localhost 8080
+\end{lstlisting}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Parámetros del Servidor}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l l X}
+\toprule
+\textbf{Parámetro} & \textbf{Fuente} & \textbf{Default} & \textbf{Descripción} \\
+\midrule
+Puerto de escucha    & CLI: \texttt{./server <puerto>}   & ---         & Puerto TCP del servidor \\
+Archivo de logs      & CLI: \texttt{./server <p> <log>}  & ---         & Ruta del archivo de logging \\
+Host de identidad    & Env: \texttt{IDENTITY\_HOST}      & localhost   & Hostname del servicio de identidad \\
+Puerto de identidad  & Env: \texttt{IDENTITY\_PORT}      & 9090        & Puerto TCP del servicio de identidad \\
+\bottomrule
+\end{tabularx}
+\caption{Parámetros de configuración del servidor}
+\end{table}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Parámetros del Mapa de Juego}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[H]
+\centering
+\begin{tabular}{l r}
+\toprule
+\textbf{Parámetro} & \textbf{Valor} \\
+\midrule
+Dimensiones del mapa             & $100 \times 100$ unidades \\
+Recursos críticos por sala       & 2 (posición aleatoria al crear sala) \\
+Radio de detección (\textsc{SCAN}) & 5 unidades (distancia euclidiana) \\
+Tiempo límite de defensa         & 30 segundos \\
+Máx.\ jugadores por sala         & 10 \\
+Máx.\ salas simultáneas          & 20 \\
+\bottomrule
+\end{tabular}
+\caption{Parámetros del mapa del juego}
+\end{table}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Consideraciones de Seguridad}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\begin{itemize}[leftmargin=2em]
+    \item Las contraseñas \textbf{no se almacenan} en el servidor de juego; se reenvían al
+          servicio de identidad en cada autenticación.
+    \item Las contraseñas \textbf{no se registran} en los logs del servidor (aparecen como
+          \texttt{[***]}).
+    \item No se implementa cifrado en esta versión (fuera del alcance del proyecto).
+    \item Cada cliente opera en un hilo independiente; un cliente malicioso no puede
+          bloquear a los demás.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\vspace{2cm}
+\hrule
+\vspace{0.3cm}
+{\small\centering\textit{Fin del documento RFC-CGSP-1 --- CyberGame Socket Protocol v1.0}\par}
+
+\end{document}
