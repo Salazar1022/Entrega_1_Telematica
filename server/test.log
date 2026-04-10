@@ -1,0 +1,5 @@
+[2026-04-09 12:49:36] [INFO ] [server] === Servidor CyberGame CGSP v1.0 iniciando ===
+[2026-04-09 12:49:36] [INFO ] [server] Sistema de juego inicializado
+[2026-04-09 12:49:36] [INFO ] [server] Socket del servidor listo en puerto 8080
+[2026-04-09 12:49:36] [INFO ] [server] Servidor escuchando en puerto 8080 — esperando conexiones...
+[2026-04-09 12:49:39] [INFO ] [server] Servidor detenido.
