@@ -1,0 +1,12 @@
+[
+  {
+    "usuario": "carlos",
+    "password_hash": "72a666c5d86b3097fe264545dbd37efea220281e59c14f8cb8f0e612f3d12b59",
+    "rol": "ATTACKER"
+  },
+  {
+    "usuario": "maria",
+    "password_hash": "662c1f79f633a7d11080203bc925fa574e99851e3c1939f3044898cfdbc6d408",
+    "rol": "DEFENDER"
+  }
+]

@@ -1,0 +1,2 @@
+2026-04-10 10:15:28,667 Iniciando Servicio de Identidad | puerto=9090 | log=identity.log
+2026-04-10 10:15:28,667 ERROR: No se encontro users.json. Abortando.

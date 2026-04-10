@@ -1,0 +1,26 @@
+2026-04-10 10:36:28,387 Iniciando Servicio de Identidad | puerto=9090 | log=identity.log
+2026-04-10 10:36:28,387 Usuarios cargados: ['carlos', 'maria']
+2026-04-10 10:36:28,423 Hostname 'localhost' resuelto correctamente
+2026-04-10 10:36:28,424 Servicio de Identidad listo y escuchando en puerto 9090
+2026-04-10 10:42:03,584 Iniciando Servicio de Identidad | puerto=9090 | log=identity.log
+2026-04-10 10:42:03,584 Usuarios cargados: ['carlos', 'maria']
+2026-04-10 10:42:03,587 Hostname 'localhost' resuelto correctamente
+2026-04-10 10:42:03,587 Servicio de Identidad listo y escuchando en puerto 9090
+2026-04-10 10:42:37,491 [127.0.0.1:55437] Conexion recibida
+2026-04-10 10:42:52,840 [127.0.0.1:55437] >> AUTH_CHECK carlos hack2026
+2026-04-10 10:42:52,840 [127.0.0.1:55437] << AUTH OK -> ATTACKER
+2026-04-10 10:43:40,991 [127.0.0.1:55439] Conexion recibida
+2026-04-10 10:43:50,892 [127.0.0.1:55439] >> AUTH_CHECK carlos malo
+2026-04-10 10:43:50,892 [127.0.0.1:55439] << AUTH FAIL -> carlos
+2026-04-10 10:44:01,187 [127.0.0.1:55440] Conexion recibida
+2026-04-10 10:44:16,511 [127.0.0.1:55440] >> AUTH_CHECK nathalia 123
+2026-04-10 10:44:16,511 [127.0.0.1:55440] << AUTH FAIL -> nathalia
+2026-04-10 10:44:21,775 [127.0.0.1:55441] Conexion recibida
+2026-04-10 10:44:23,966 [127.0.0.1:55441] >> hola
+2026-04-10 10:44:23,966 [127.0.0.1:55441] << Formato invalido: hola
+2026-04-10 10:44:59,352 [127.0.0.1:55451] Conexion recibida
+2026-04-10 10:45:00,986 [127.0.0.1:55451] >> hola
+2026-04-10 10:45:00,986 [127.0.0.1:55451] << Formato invalido: hola
+2026-04-10 10:45:20,711 [127.0.0.1:55455] Conexion recibida
+2026-04-10 10:45:37,829 [127.0.0.1:55455] >> ola
+2026-04-10 10:45:37,830 [127.0.0.1:55455] << Formato invalido: ola
