@@ -4,7 +4,7 @@
 # CÓMO USAR:
 #   make          → Compila el servidor
 #   make clean    → Elimina los archivos compilados
-#   make run      → Compila y ejecuta en el puerto 8080 con logs en server.log
+#   make run      → Compila y ejecuta en el puerto 8081 con logs en server.log
 #   make help     → Muestra este mensaje
 #
 # COMPILADOR Y FLAGS:
@@ -72,7 +72,7 @@ clean:
 # ── Compilar y ejecutar directamente ────────────────────────────────────────
 .PHONY: run
 run: $(TARGET)
-	./$(TARGET) 8080 server.log
+	./$(TARGET) 8081 server.log
 
 # ── Mostrar ayuda ────────────────────────────────────────────────────────────
 .PHONY: help
@@ -80,5 +80,5 @@ help:
 	@echo "Comandos disponibles:"
 	@echo "  make        → Compila el servidor"
 	@echo "  make clean  → Elimina archivos compilados (.o y ejecutable)"
-	@echo "  make run    → Compila y ejecuta en puerto 8080"
+	@echo "  make run    → Compila y ejecuta en puerto 8081"
 	@echo "  make help   → Muestra esta ayuda"

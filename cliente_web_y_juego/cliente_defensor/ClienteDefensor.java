@@ -16,8 +16,15 @@ import java.util.Map;
 import java.util.Set;
 
 public class ClienteDefensor extends JFrame {
-    private static final String HOST = "localhost";
-    private static final int PORT = 8081;
+    private static final int MAP_WIDTH = 100;
+    private static final int MAP_HEIGHT = 100;
+    private static final int CANVAS_SIZE = 500;
+
+    private static final String HOST = envOrDefault("CGSP_HOST", "localhost");
+    private static final int PORT = parseIntEnv("CGSP_PORT", 8081);
+    private static final String CGSP_USER = envOrDefault("CGSP_USER", "defensor1");
+    private static final String CGSP_PASS = envOrDefault("CGSP_PASS", "pass123");
+    private static final String CGSP_ROOM = envOrDefault("CGSP_ROOM", "1");
 
     private Socket socket;
     private PrintWriter out;
@@ -26,8 +33,8 @@ public class ClienteDefensor extends JFrame {
     private String estado = "CONECTADO";
 
     // Variables del jugador
-    private int x = 400; // Posición inicial
-    private int y = 400;
+    private int x = 0; // Coordenadas lógicas del servidor (0..99)
+    private int y = 0;
     private int step = 10;
     private final int playerSize = 15;
     private final int resourceSize = 8;
@@ -41,7 +48,7 @@ public class ClienteDefensor extends JFrame {
 
     public ClienteDefensor() {
         super("CyberDef - Cliente Defensor");
-        setSize(600, 650);
+        setSize(700, 760);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setResizable(false);
         setLayout(new BorderLayout());
@@ -75,40 +82,45 @@ public class ClienteDefensor extends JFrame {
 
                 // Dibujar límite (simulando las distancias de 0 a 100 x escala)
                 g.setColor(Color.BLUE);
-                g.drawRect(0, 0, 500 - 1, 500 - 1);
+                g.drawRect(0, 0, CANVAS_SIZE - 1, CANVAS_SIZE - 1);
 
                 // Dibujar al defensor (Círculo Azul)
+                Point playerPixel = worldToCanvas(x, y);
                 g.setColor(Color.CYAN);
-                g.fillOval(x - playerSize, y - playerSize, playerSize * 2, playerSize * 2);
+                g.fillOval(playerPixel.x - playerSize, playerPixel.y - playerSize, playerSize * 2, playerSize * 2);
                 g.setColor(Color.WHITE);
-                g.drawOval(x - playerSize, y - playerSize, playerSize * 2, playerSize * 2);
+                g.drawOval(playerPixel.x - playerSize, playerPixel.y - playerSize, playerSize * 2, playerSize * 2);
 
                 // Dibujar recursos críticos y marcar los que están bajo ataque.
                 for (Map.Entry<String, Point> entry : resourcePositions.entrySet()) {
                     String resourceId = entry.getKey();
                     Point p = entry.getValue();
+                    Point resourcePixel = worldToCanvas(p.x, p.y);
                     boolean attacked = attackedResources.contains(resourceId);
 
                     Color fill = attacked ? new Color(220, 38, 38) : new Color(34, 197, 94);
                     Color outline = attacked ? new Color(127, 29, 29) : new Color(20, 83, 45);
 
                     g.setColor(fill);
-                    g.fillRect(p.x - resourceSize, p.y - resourceSize, resourceSize * 2, resourceSize * 2);
+                    g.fillRect(resourcePixel.x - resourceSize, resourcePixel.y - resourceSize, resourceSize * 2,
+                            resourceSize * 2);
                     g.setColor(outline);
-                    g.drawRect(p.x - resourceSize, p.y - resourceSize, resourceSize * 2, resourceSize * 2);
+                    g.drawRect(resourcePixel.x - resourceSize, resourcePixel.y - resourceSize, resourceSize * 2,
+                            resourceSize * 2);
 
                     g.setColor(Color.WHITE);
                     g.setFont(new Font("Consolas", Font.BOLD, 11));
-                    g.drawString("R" + resourceId, p.x - resourceSize, p.y - (resourceSize + 4));
+                    g.drawString("R" + resourceId, resourcePixel.x - resourceSize,
+                            resourcePixel.y - (resourceSize + 4));
                 }
             }
         };
-        canvas.setPreferredSize(new Dimension(500, 500));
+        canvas.setPreferredSize(new Dimension(CANVAS_SIZE, CANVAS_SIZE));
         add(canvas, BorderLayout.CENTER);
 
         // Controles e info
         JPanel bottomPanel = new JPanel(new BorderLayout());
-        JLabel tutorial = new JLabel("Controles: W,A,S,D (Mover), F (Defender Recurso 0)");
+        JLabel tutorial = new JLabel("Controles: W,A,S,D (Mover), F (Defender recurso atacado mas cercano)");
         tutorial.setHorizontalAlignment(SwingConstants.CENTER);
         bottomPanel.add(tutorial, BorderLayout.NORTH);
 
@@ -117,13 +129,13 @@ public class ClienteDefensor extends JFrame {
         JButton leftBtn = new JButton("A");
         JButton downBtn = new JButton("S");
         JButton rightBtn = new JButton("D");
-        JButton defendBtn = new JButton("DEFEND 0");
+        JButton defendBtn = new JButton("DEFEND AUTO");
 
         upBtn.addActionListener(e -> moverJugador(0, -step));
         leftBtn.addActionListener(e -> moverJugador(-step, 0));
         downBtn.addActionListener(e -> moverJugador(0, step));
         rightBtn.addActionListener(e -> moverJugador(step, 0));
-        defendBtn.addActionListener(e -> enviarEstado("DEFEND 0\n"));
+        defendBtn.addActionListener(e -> defenderRecursoObjetivo());
 
         controlsPanel.add(upBtn);
         controlsPanel.add(leftBtn);
@@ -157,7 +169,7 @@ public class ClienteDefensor extends JFrame {
                 } else if (c == 'd') {
                     moverJugador(step, 0);
                 } else if (c == 'f') {
-                    enviarEstado("DEFEND 0\n");
+                    defenderRecursoObjetivo();
                     return;
                 } // Botón DEFEND para CGSP
             }
@@ -172,13 +184,67 @@ public class ClienteDefensor extends JFrame {
         if (!connected)
             return;
 
-        // Prevenir salir del mapa (0-500 en la GUI)
-        if (x + dx >= 0 && x + dx <= 500 && y + dy >= 0 && y + dy <= 500) {
-            x += dx;
-            y += dy;
-            canvas.repaint();
-            enviarEstado("MOVE " + dx + " " + dy + "\n");
+        int newX = Math.max(0, Math.min(MAP_WIDTH - 1, x + dx));
+        int newY = Math.max(0, Math.min(MAP_HEIGHT - 1, y + dy));
+
+        if (newX == x && newY == y) {
+            return;
         }
+
+        x = newX;
+        y = newY;
+        canvas.repaint();
+        enviarEstado("MOVE " + dx + " " + dy + "\n");
+    }
+
+    private Point worldToCanvas(int worldX, int worldY) {
+        double scaleX = (double) (CANVAS_SIZE - 1) / (MAP_WIDTH - 1);
+        double scaleY = (double) (CANVAS_SIZE - 1) / (MAP_HEIGHT - 1);
+        int canvasX = (int) Math.round(worldX * scaleX);
+        int canvasY = (int) Math.round(worldY * scaleY);
+        return new Point(canvasX, canvasY);
+    }
+
+    private void defenderRecursoObjetivo() {
+        String selected = null;
+        int bestDist2 = Integer.MAX_VALUE;
+
+        // Priorizar recursos actualmente bajo ataque.
+        for (String resourceId : attackedResources) {
+            Point p = resourcePositions.get(resourceId);
+            if (p == null) {
+                continue;
+            }
+
+            int dx = p.x - x;
+            int dy = p.y - y;
+            int dist2 = dx * dx + dy * dy;
+            if (dist2 < bestDist2) {
+                bestDist2 = dist2;
+                selected = resourceId;
+            }
+        }
+
+        // Fallback: si no hay eventos ATTACK, usar el recurso conocido mas cercano.
+        if (selected == null) {
+            for (Map.Entry<String, Point> entry : resourcePositions.entrySet()) {
+                Point p = entry.getValue();
+                int dx = p.x - x;
+                int dy = p.y - y;
+                int dist2 = dx * dx + dy * dy;
+                if (dist2 < bestDist2) {
+                    bestDist2 = dist2;
+                    selected = entry.getKey();
+                }
+            }
+        }
+
+        if (selected == null) {
+            selected = "0";
+        }
+
+        enviarEstado("DEFEND " + selected + "\n");
+        logModel.add(0, "C->S: DEFEND " + selected);
     }
 
     private void conectarServidor() {
@@ -190,7 +256,8 @@ public class ClienteDefensor extends JFrame {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
             connected = true;
 
-            statusLabel.setText("CGSP Socket IP: " + address.getHostAddress() + ":" + PORT);
+            statusLabel.setText("CGSP Socket IP: " + address.getHostAddress() + ":" + PORT + " | usuario=" + CGSP_USER
+                    + " sala=" + CGSP_ROOM);
             statusLabel.setForeground(new Color(0, 150, 0));
 
             // Loggeo en consola visual
@@ -202,7 +269,7 @@ public class ClienteDefensor extends JFrame {
             rxThread.start();
 
             // Máquina de estados: Enviar autenticación
-            enviarEstado("AUTH defensor1 seg2026\n");
+            enviarEstado("AUTH " + CGSP_USER + " " + CGSP_PASS + "\n");
 
         } catch (UnknownHostException e) {
             statusLabel.setText("Fallo resolución DNS de " + HOST);
@@ -254,11 +321,29 @@ public class ClienteDefensor extends JFrame {
         if (c.equals("OK")) {
             if (comando.contains("Bienvenido")) {
                 estado = "AUTENTICADO";
+            } else if (partes.length >= 4 && partes[1].startsWith("Posicion")) {
+                int serverX = parseSafeInt(partes[2], x);
+                int serverY = parseSafeInt(partes[3], y);
+                x = Math.max(0, Math.min(MAP_WIDTH - 1, serverX));
+                y = Math.max(0, Math.min(MAP_HEIGHT - 1, serverY));
+                canvas.repaint();
             }
         } else if (c.equals("ROLE")) {
             estado = "AUTENTICADO";
-            // Una vez logueado, simula unirse a la sala
-            enviarEstado("JOIN 3\n");
+            // Una vez logueado, unirse a la sala y luego intentar iniciar la partida
+            // (esperando que ya haya al menos 1 atacante y 1 defensor)
+            new Thread(() -> {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                }
+                SwingUtilities.invokeLater(() -> enviarEstado("JOIN " + CGSP_ROOM + "\n"));
+                try {
+                    Thread.sleep(400);
+                } catch (InterruptedException ignored) {
+                }
+                SwingUtilities.invokeLater(() -> enviarEstado("START\n"));
+            }).start();
         } else if (c.equals("EVENT")) {
             if (partes.length < 2)
                 return;
@@ -272,8 +357,8 @@ public class ClienteDefensor extends JFrame {
                 case "RESOURCE_INFO":
                     // El servidor nos da info de los recursos críticos al iniciar
                     if (partes.length >= 5) {
-                        int rx = parseSafeInt(partes[3], 0);
-                        int ry = parseSafeInt(partes[4], 0);
+                        int rx = Math.max(0, Math.min(MAP_WIDTH - 1, parseSafeInt(partes[3], 0)));
+                        int ry = Math.max(0, Math.min(MAP_HEIGHT - 1, parseSafeInt(partes[4], 0)));
                         resourcePositions.put(partes[2], new Point(rx, ry));
                         attackedResources.remove(partes[2]);
                         canvas.repaint();
@@ -320,6 +405,26 @@ public class ClienteDefensor extends JFrame {
         try {
             return Integer.parseInt(value);
         } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    private static String envOrDefault(String key, String fallback) {
+        String value = System.getenv(key);
+        if (value == null || value.trim().isEmpty()) {
+            return fallback;
+        }
+        return value.trim();
+    }
+
+    private static int parseIntEnv(String key, int fallback) {
+        String value = System.getenv(key);
+        if (value == null || value.trim().isEmpty()) {
+            return fallback;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
             return fallback;
         }
     }

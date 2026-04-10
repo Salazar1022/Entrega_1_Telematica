@@ -37,7 +37,7 @@
 #define MAX_PLAYERS       10       /* Máx. jugadores por sala           */
 #define MAX_ROOMS         20       /* Máx. salas simultáneas            */
 #define NUM_RESOURCES     2        /* Recursos críticos por sala        */
-#define DETECTION_RADIUS  5        /* Radio de detección al hacer SCAN  */
+#define DETECTION_RADIUS  12       /* Radio de detección al hacer SCAN  */
 #define ATTACK_TIMEOUT    30       /* Segundos para defender un ataque  */
 #define MAX_USERNAME      64       /* Largo máximo del nombre de usuario*/
 #define MAX_ROOM_ID       16       /* Largo máximo del ID de sala       */
@@ -174,7 +174,8 @@ int player_scan(Player *player, char *found_msg, int msg_size);
  * resource_attack()
  * El atacante lanza un ataque al recurso `resource_id`.
  * Notifica a TODOS los defensores de la sala con EVENT ATTACK.
- * Retorna 0 si OK, -1 si el recurso no existe, -2 si ya está bajo ataque.
+ * Retorna 0 si OK, -1 si el recurso no existe/sala invalida,
+ * -2 si ya está bajo ataque, -3 si el atacante está muy lejos.
  */
 int resource_attack(Player *attacker, int resource_id);
 
@@ -182,7 +183,8 @@ int resource_attack(Player *attacker, int resource_id);
  * resource_defend()
  * El defensor mitiga el ataque al recurso `resource_id`.
  * Detiene el timer de ataque y notifica a todos con EVENT DEFENDED.
- * Retorna 0 si OK, -1 si el recurso no existe, -2 si no hay ataque activo.
+ * Retorna 0 si OK, -1 si el recurso no existe/sala invalida,
+ * -2 si no hay ataque activo, -3 si el defensor está muy lejos.
  */
 int resource_defend(Player *defender, int resource_id);
 

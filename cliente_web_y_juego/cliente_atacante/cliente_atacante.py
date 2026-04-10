@@ -1,11 +1,29 @@
 import socket
 import threading
 import tkinter as tk
+import os
 from tkinter import scrolledtext
 
-# Configuración del servidor de juego
-HOST = 'localhost' # Requisito 3: No usar IP quemada, resolver por DNS
-PORT = 8081
+# ──────────────────────────────────────────────────────────────────────────────
+# Configuración del servidor de juego (via variables de entorno o defaults)
+#
+# Usuarios de prueba (deben coincidir con identity_stub.py):
+#   atacante1 / pass123  → ATTACKER
+#   hacker    / hack2026 → ATTACKER
+#   admin     / admin    → ATTACKER
+#
+# Uso:
+#   $env:CGSP_USER="atacante1"; $env:CGSP_PASS="pass123"; python cliente_atacante.py
+# ──────────────────────────────────────────────────────────────────────────────
+HOST      = os.getenv('CGSP_HOST', 'localhost')
+PORT      = int(os.getenv('CGSP_PORT', '8081'))
+CGSP_USER = os.getenv('CGSP_USER', 'atacante1')
+CGSP_PASS = os.getenv('CGSP_PASS', 'pass123')
+CGSP_ROOM = os.getenv('CGSP_ROOM', '1')
+
+MAP_WIDTH = 100
+MAP_HEIGHT = 100
+CANVAS_SIZE = 500
 
 class AtacanteCLI:
     def __init__(self, root):
@@ -14,14 +32,15 @@ class AtacanteCLI:
         self.root.geometry("700x760")
         self.root.resizable(False, False)
         
-        # Posición inicial del atacante
-        self.x = 50
-        self.y = 50
+        # Coordenadas lógicas del servidor (0..99)
+        self.x = 0
+        self.y = 0
         self.step = 10
         self.player_size = 15
         self.resource_size = 8
         self.resources = {}
         self.resource_canvas_items = {}
+        self.selected_resource_id = 0
 
         # Socket setup
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -37,12 +56,16 @@ class AtacanteCLI:
         self.status_label = tk.Label(self.root, textvariable=self.status_var, font=("Arial", 12, "bold"), fg="red")
         self.status_label.pack(pady=10)
 
-        self.canvas = tk.Canvas(self.root, width=500, height=500, bg="#1e1e1e", highlightbackground="red", highlightthickness=2)
+        self.canvas = tk.Canvas(self.root, width=CANVAS_SIZE, height=CANVAS_SIZE, bg="#1e1e1e", highlightbackground="red", highlightthickness=2)
         self.canvas.pack()
 
+        self.canvas.create_rectangle(0, 0, CANVAS_SIZE - 1, CANVAS_SIZE - 1, outline="#7f1d1d")
+
+        px, py = self._world_to_canvas(self.x, self.y)
+
         self.player_id = self.canvas.create_oval(
-            self.x - self.player_size, self.y - self.player_size, 
-            self.x + self.player_size, self.y + self.player_size, 
+            px - self.player_size, py - self.player_size,
+            px + self.player_size, py + self.player_size,
             fill="red", outline="white"
         )
 
@@ -75,14 +98,14 @@ class AtacanteCLI:
             self.client_socket.connect((ip_servidor, PORT))
             self.connected = True
 
-            self.status_var.set(f"CGSP Socket IP: {ip_servidor}:{PORT}")
+            self.status_var.set(f"CGSP Socket IP: {ip_servidor}:{PORT} | usuario={CGSP_USER} sala={CGSP_ROOM}")
             self.status_label.config(fg="green")
 
             t1 = threading.Thread(target=self.recibir_eventos, daemon=True)
             t1.start()
 
             self.log("Conectado al servidor. Iniciando AUTH...")
-            self.enviar_comando("AUTH atacante1 hack2026")
+            self.enviar_comando(f"AUTH {CGSP_USER} {CGSP_PASS}")
         except socket.gaierror:
             self.status_var.set(f"Fallo resolución DNS de {HOST}")
             self.log(f"No se pudo resolver DNS para {HOST}")
@@ -114,9 +137,9 @@ class AtacanteCLI:
         if not self.connected:
             return
 
-        new_x = self.x + dx
-        new_y = self.y + dy
-        if not (0 <= new_x <= 500 and 0 <= new_y <= 500):
+        new_x = max(0, min(MAP_WIDTH - 1, self.x + dx))
+        new_y = max(0, min(MAP_HEIGHT - 1, self.y + dy))
+        if new_x == self.x and new_y == self.y:
             return
 
         self.x = new_x
@@ -130,13 +153,19 @@ class AtacanteCLI:
 
     def action_attack(self):
         if self.connected:
-            self.enviar_comando("ATTACK 0")
+            self.enviar_comando(f"ATTACK {self.selected_resource_id}")
+
+    def _world_to_canvas(self, x, y):
+        scale_x = (CANVAS_SIZE - 1) / (MAP_WIDTH - 1)
+        scale_y = (CANVAS_SIZE - 1) / (MAP_HEIGHT - 1)
+        return int(round(x * scale_x)), int(round(y * scale_y))
 
     def actualizar_render(self):
+        px, py = self._world_to_canvas(self.x, self.y)
         self.canvas.coords(
             self.player_id,
-            self.x - self.player_size, self.y - self.player_size,
-            self.x + self.player_size, self.y + self.player_size
+            px - self.player_size, py - self.player_size,
+            px + self.player_size, py + self.player_size
         )
 
     def _parse_int(self, value, default=None):
@@ -146,18 +175,18 @@ class AtacanteCLI:
             return default
 
     def _fallback_resource_xy(self, resource_id):
-        # Si el evento no trae coordenadas, distribuimos puntos de forma estable para visualizar el recurso.
+        # Si el evento no trae coordenadas, distribuimos puntos en el mapa lógico 0..99.
         base = abs(hash(resource_id))
-        x = 40 + (base % 420)
-        y = 40 + ((base // 101) % 420)
+        x = 5 + (base % (MAP_WIDTH - 10))
+        y = 5 + ((base // 101) % (MAP_HEIGHT - 10))
         return x, y
 
     def _upsert_resource(self, resource_id, x=None, y=None, attacked=None):
         resource = self.resources.get(resource_id, {})
 
         if x is not None and y is not None:
-            resource['x'] = x
-            resource['y'] = y
+            resource['x'] = max(0, min(MAP_WIDTH - 1, x))
+            resource['y'] = max(0, min(MAP_HEIGHT - 1, y))
         elif 'x' not in resource or 'y' not in resource:
             fx, fy = self._fallback_resource_xy(resource_id)
             resource['x'] = fx
@@ -176,8 +205,7 @@ class AtacanteCLI:
         if not resource:
             return
 
-        x = resource['x']
-        y = resource['y']
+        x, y = self._world_to_canvas(resource['x'], resource['y'])
         attacked = resource.get('attacked', False)
         fill = '#ef4444' if attacked else '#facc15'
         outline = '#7f1d1d' if attacked else '#a16207'
@@ -257,11 +285,17 @@ class AtacanteCLI:
             if "Bienvenido" in comando:
                 self.estado = "AUTENTICADO"
                 self.log("Autenticado correctamente")
+            elif len(partes) >= 4 and partes[1].startswith('Posicion'):
+                px = self._parse_int(partes[2], self.x)
+                py = self._parse_int(partes[3], self.y)
+                self.x = max(0, min(MAP_WIDTH - 1, px))
+                self.y = max(0, min(MAP_HEIGHT - 1, py))
+                self.root.after(0, self.actualizar_render)
         elif c == 'ROLE':
             self.estado = "AUTENTICADO"
             role = partes[1] if len(partes) > 1 else "DESCONOCIDO"
             self.log(f"Rol asignado: {role}")
-            threading.Timer(0.5, lambda: self.enviar_comando("JOIN 3")).start()
+            threading.Timer(0.5, lambda: self.enviar_comando(f"JOIN {CGSP_ROOM}")).start()
         elif c in ('ROOM_CREATED', 'ROOM_LIST', 'ROOM'):
             return
         elif c == 'EVENT':
@@ -275,8 +309,10 @@ class AtacanteCLI:
                 resource_id = partes[2] if len(partes) > 2 else "?"
                 x = self._parse_int(partes[3] if len(partes) > 3 else None)
                 y = self._parse_int(partes[4] if len(partes) > 4 else None)
+                parsed_id = self._parse_int(resource_id, self.selected_resource_id)
+                self.selected_resource_id = parsed_id
                 self.root.after(0, lambda rid=resource_id, rx=x, ry=y: self._upsert_resource(rid, rx, ry, attacked=False))
-                self.log(f"Recurso encontrado: {resource_id}")
+                self.log(f"Recurso encontrado: {resource_id} ({x},{y})")
             elif event_type == 'ATTACK':
                 resource_id = partes[2] if len(partes) > 2 else "?"
                 self.root.after(0, lambda rid=resource_id: self._upsert_resource(rid, attacked=True))

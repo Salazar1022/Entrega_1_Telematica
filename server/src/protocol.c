@@ -379,6 +379,8 @@ static int handle_attack(Player *player, ParsedMessage *msg) {
                           player->client_ip, player->client_port); break;
         case -2: send_err(player->socket_fd, 409, "Recurso ya bajo ataque",
                           player->client_ip, player->client_port); break;
+        case -3: send_err(player->socket_fd, 409, "Debes estar cerca del recurso para atacarlo",
+                          player->client_ip, player->client_port); break;
     }
     return 0;
 }
@@ -404,6 +406,8 @@ static int handle_defend(Player *player, ParsedMessage *msg) {
         case -1: send_err(player->socket_fd, 404, "Recurso no encontrado",
                           player->client_ip, player->client_port); break;
         case -2: send_err(player->socket_fd, 409, "No hay ataque activo en ese recurso",
+                          player->client_ip, player->client_port); break;
+        case -3: send_err(player->socket_fd, 409, "Debes estar cerca del recurso para defenderlo",
                           player->client_ip, player->client_port); break;
     }
     return 0;

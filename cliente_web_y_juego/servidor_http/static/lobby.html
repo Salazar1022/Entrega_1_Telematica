@@ -102,94 +102,14 @@
                 </div>
 
                 <div class="rooms-list" id="roomsList">
-                    <!-- Room 001 -->
-                    <div class="room-card">
-                        <div class="room-card__left">
-                            <div class="room-id mono">#001</div>
-                            <div class="room-details">
-                                <span class="room-name">Bosque Oscuro</span>
-                                <div class="room-meta">
-                                    <span class="room-status room-status--waiting">● Esperando</span>
-                                    <span class="room-players">
-                                        <span class="room-players__filled">1</span>
-                                        <span class="room-players__sep">/</span>
-                                        <span class="room-players__total">2</span>
-                                        jugadores
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="room-card__right">
-                            <div class="room-roles">
-                                <span class="role-slot role-slot--taken" title="Atacante ocupado">⚔</span>
-                                <span class="role-slot role-slot--open" title="Defensor libre">🛡</span>
-                            </div>
-                            <button class="btn-join" onclick="joinRoom('001')">
-                                Unirse →
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Room 002 -->
-                    <div class="room-card room-card--full">
-                        <div class="room-card__left">
-                            <div class="room-id mono">#002</div>
-                            <div class="room-details">
-                                <span class="room-name">Base Alpha</span>
-                                <div class="room-meta">
-                                    <span class="room-status room-status--active">● En progreso</span>
-                                    <span class="room-players">
-                                        <span class="room-players__filled">2</span>
-                                        <span class="room-players__sep">/</span>
-                                        <span class="room-players__total">2</span>
-                                        jugadores
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="room-card__right">
-                            <div class="room-roles">
-                                <span class="role-slot role-slot--taken" title="Atacante ocupado">⚔</span>
-                                <span class="role-slot role-slot--taken" title="Defensor ocupado">🛡</span>
-                            </div>
-                            <button class="btn-join btn-join--disabled" disabled>
-                                Llena
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Room 003 -->
-                    <div class="room-card">
-                        <div class="room-card__left">
-                            <div class="room-id mono">#003</div>
-                            <div class="room-details">
-                                <span class="room-name">Nodo Central</span>
-                                <div class="room-meta">
-                                    <span class="room-status room-status--waiting">● Esperando</span>
-                                    <span class="room-players">
-                                        <span class="room-players__filled">0</span>
-                                        <span class="room-players__sep">/</span>
-                                        <span class="room-players__total">2</span>
-                                        jugadores
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="room-card__right">
-                            <div class="room-roles">
-                                <span class="role-slot role-slot--open" title="Atacante libre">⚔</span>
-                                <span class="role-slot role-slot--open" title="Defensor libre">🛡</span>
-                            </div>
-                            <button class="btn-join" onclick="joinRoom('003')">
-                                Unirse →
-                            </button>
-                        </div>
-                    </div>
-
+                    <!-- Las salas se cargan dinámicamente desde el servidor CGSP -->
                     <div class="rooms-empty" id="roomsEmpty" style="display:none">
                         <span class="mono" style="color:var(--text-muted); font-size:0.85rem">
                             — No hay partidas activas. Crea una nueva. —
                         </span>
+                    </div>
+                    <div id="roomsLoading" style="text-align:center; padding:2rem 0; color:var(--text-muted)">
+                        <span class="mono" style="font-size:0.85rem">Cargando salas...</span>
                     </div>
                 </div>
 
@@ -309,6 +229,11 @@
     <script>
         const storedUser = sessionStorage.getItem('co_username') || 'operador_01';
         const storedRole = sessionStorage.getItem('co_role') || 'atacante';
+        const sessionToken = sessionStorage.getItem('co_session_token') || '';
+
+        if (!sessionToken) {
+            window.location.href = 'index.html';
+        }
 
         const roleLabel = storedRole === 'defensor' ? 'Defensor' : 'Atacante';
         const roleIcon = storedRole === 'defensor' ? '🛡' : '⚔';
@@ -340,6 +265,10 @@
         function renderRooms(rooms) {
             const container = document.getElementById('roomsList');
             const empty = document.getElementById('roomsEmpty');
+            const loading = document.getElementById('roomsLoading');
+
+            // Ocultar spinner de carga
+            if (loading) loading.style.display = 'none';
 
             if (!rooms.length) {
                 container.innerHTML = '';
@@ -359,7 +288,7 @@
                 return `
                     <div class="${statusClass}">
                         <div class="room-card__left">
-                            <div class="room-id mono">#${room.id}</div>
+                            <div class="room-id mono">#${String(room.id).padStart(3,'0')}</div>
                             <div class="room-details">
                                 <span class="room-name">${roomName}</span>
                                 <div class="room-meta">
@@ -395,16 +324,30 @@
             const icon = document.getElementById('refresh-icon');
             icon.style.animation = 'spin 0.6s linear';
 
+            const loading = document.getElementById('roomsLoading');
+            if (loading) loading.style.display = 'block';
+
             try {
-                const response = await fetch('/api/rooms');
+                const response = await fetch('/api/rooms', {
+                    headers: { 'X-Session-Token': sessionToken }
+                });
                 const payload = await response.json();
                 if (!response.ok || !Array.isArray(payload.rooms)) {
-                    throw new Error('Respuesta invalida de /api/rooms');
+                    throw new Error(payload.error || 'Respuesta invalida de /api/rooms');
                 }
                 renderRooms(payload.rooms);
             } catch (error) {
-                console.error(error);
-                alert('No se pudieron cargar las salas. Verifica que el servidor HTTP esté activo.');
+                console.warn('refreshRooms error:', error);
+                if (loading) loading.style.display = 'none';
+                const container = document.getElementById('roomsList');
+                container.innerHTML = `
+                    <div style="text-align:center; padding:1.5rem 0; color:#ef4444">
+                        <span class="mono" style="font-size:0.82rem">
+                            ⚠ No se pudieron cargar las salas<br>
+                            <span style="color:var(--text-muted)">Verifica que el servidor CGSP esté activo en el puerto 8081</span>
+                        </span>
+                    </div>
+                `;
             } finally {
                 setTimeout(() => { icon.style.animation = ''; }, 600);
             }
@@ -420,7 +363,10 @@
                 const body = new URLSearchParams({ name: `Sala de ${storedUser}` });
                 const response = await fetch('/api/create-room', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Session-Token': sessionToken
+                    },
                     body: body.toString()
                 });
                 const payload = await response.json();
@@ -454,6 +400,10 @@
                 return;
             }
 
+            const confirmBtn = document.querySelector('.modal-confirm');
+            confirmBtn.textContent = 'Uniéndose...';
+            confirmBtn.disabled = true;
+
             try {
                 const body = new URLSearchParams({
                     room_id: pendingRoom,
@@ -463,7 +413,10 @@
 
                 const response = await fetch('/api/join-room', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Session-Token': sessionToken
+                    },
                     body: body.toString()
                 });
 
@@ -474,9 +427,56 @@
 
                 closeModal();
                 await refreshRooms();
-                alert(`Te uniste a la sala #${payload.room.id}. Ahora puedes abrir tu cliente desktop.`);
+
+                // Mostrar panel de éxito con config desktop
+                if (payload.desktop_config) {
+                    const c = payload.desktop_config;
+                    const isPython = storedRole !== 'defensor';
+                    const clientFile = isPython
+                        ? 'cliente_web_y_juego\\cliente_atacante\\cliente_atacante.py'
+                        : 'cd cliente_web_y_juego\\cliente_defensor && javac ClienteDefensor.java && java ClienteDefensor';
+
+                    const envVars = [
+                        `$env:CGSP_HOST="${c.host}"`,
+                        `$env:CGSP_PORT="${c.port}"`,
+                        `$env:CGSP_USER="${c.username}"`,
+                        `$env:CGSP_PASS="${c.password}"`,
+                        `$env:CGSP_ROOM="${c.room_id}"`
+                    ].join('\n');
+
+                    const launchCmd = isPython
+                        ? `${envVars}\npython ${clientFile}`
+                        : `${envVars}\n${clientFile}`;
+
+                    // Mostrar config en el panel de servidor del lobby
+                    const serverPanel = document.querySelector('.server-panel');
+                    if (serverPanel) {
+                        serverPanel.innerHTML = `
+                            <div class="server-panel__header">
+                                <span class="server-panel__title mono" style="color:#22c55e">✓ En Sala #${c.room_id}</span>
+                            </div>
+                            <p style="font-size:0.78rem; color:var(--text-muted); margin:0.5rem 0">
+                                ${payload.started ? '🟢 Partida iniciada' : '🟡 ' + (payload.start_message || 'Esperando más jugadores')}
+                            </p>
+                            <p style="font-size:0.78rem; color:var(--text-muted); margin:0.5rem 0">Lanza tu cliente desktop (PowerShell):</p>
+                            <pre id="desktop-config-pre" style="background:#0f172a; color:#67e8f9; font-size:0.72rem; padding:0.75rem; border-radius:8px; overflow:auto; margin:0.5rem 0; white-space:pre-wrap; border:1px solid #1e3a5f; cursor:pointer" title="Clic para copiar">${launchCmd}</pre>
+                            <p style="font-size:0.72rem; color:var(--text-muted); margin:0">Clic en el bloque para copiar</p>
+                        `;
+                        document.getElementById('desktop-config-pre').addEventListener('click', () => {
+                            navigator.clipboard.writeText(launchCmd).then(() => {
+                                document.getElementById('desktop-config-pre').style.borderColor = '#22c55e';
+                                setTimeout(() => {
+                                    document.getElementById('desktop-config-pre').style.borderColor = '#1e3a5f';
+                                }, 1500);
+                            });
+                        });
+                    }
+                }
             } catch (error) {
                 alert(error.message || 'No fue posible unirse a la sala.');
+            } finally {
+                confirmBtn.textContent = 'Confirmar →';
+                confirmBtn.disabled = false;
             }
         }
 

@@ -279,6 +279,7 @@
 
                 sessionStorage.setItem('co_username', payload.username);
                 sessionStorage.setItem('co_role', payload.role);
+                sessionStorage.setItem('co_session_token', payload.session_token || '');
                 window.location.href = 'lobby.html';
             } catch (error) {
                 showLoginError('No fue posible conectar con el servidor HTTP.');

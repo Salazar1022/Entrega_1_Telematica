@@ -220,9 +220,9 @@ int room_join(int room_id, Player *player) {
                 player->y = 0;
             } else {
                 room->defender_count++;
-                /* El defensor también empieza en (0,0) */
-                player->x = 0;
-                player->y = 0;
+                /* El defensor empieza en la esquina opuesta para separar spawns */
+                player->x = MAP_WIDTH - 1;
+                player->y = MAP_HEIGHT - 1;
             }
 
             player->in_room = 1;
@@ -405,6 +405,12 @@ int resource_attack(Player *attacker, int resource_id) {
 
     Resource *res = &room->resources[resource_id];
 
+    double dist = distance(attacker->x, attacker->y, res->x, res->y);
+    if (dist > DETECTION_RADIUS) {
+        pthread_mutex_unlock(&rooms_mutex);
+        return -3;  /* Muy lejos del recurso */
+    }
+
     if (res->under_attack) {
         pthread_mutex_unlock(&rooms_mutex);
         return -2;  /* Ya está bajo ataque */
@@ -460,6 +466,12 @@ int resource_defend(Player *defender, int resource_id) {
     if (!res->under_attack) {
         pthread_mutex_unlock(&rooms_mutex);
         return -2;  /* No hay ataque activo en este recurso */
+    }
+
+    double dist = distance(defender->x, defender->y, res->x, res->y);
+    if (dist > DETECTION_RADIUS) {
+        pthread_mutex_unlock(&rooms_mutex);
+        return -3;  /* Muy lejos del recurso */
     }
 
     /* Mitigar el ataque */
@@ -526,8 +538,8 @@ void room_remove_player(Player *player) {
             }
         }
 
-        /* Si la sala quedó vacía, marcarla como inactiva */
-        if (room->player_count == 0) {
+        /* Si la sala quedó vacía y no está en espera, marcarla como inactiva */
+        if (room->player_count == 0 && room->state != ROOM_WAITING) {
             room->id    = 0;
             room->state = ROOM_WAITING;
             char log_msg[64];
