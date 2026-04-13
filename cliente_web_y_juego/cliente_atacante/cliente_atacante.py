@@ -1,20 +1,21 @@
+""" 
+Configuración del servidor de juego (via variables de entorno o defaults)
+
+ Usuarios de prueba (deben coincidir con el servicio de identidad):
+   atacante1 / pass123  → ATTACKER
+   hacker    / hack2026 → ATTACKER
+   admin     / admin    → ATTACKER
+
+  Uso:
+  $env:CGSP_USER="atacante1"; $env:CGSP_PASS="pass123"; python cliente_atacante.py
+"""
+
 import socket
 import threading
 import tkinter as tk
 import os
 from tkinter import scrolledtext
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Configuración del servidor de juego (via variables de entorno o defaults)
-#
-# Usuarios de prueba (deben coincidir con el servicio de identidad):
-#   atacante1 / pass123  → ATTACKER
-#   hacker    / hack2026 → ATTACKER
-#   admin     / admin    → ATTACKER
-#
-# Uso:
-#   $env:CGSP_USER="atacante1"; $env:CGSP_PASS="pass123"; python cliente_atacante.py
-# ──────────────────────────────────────────────────────────────────────────────
 HOST      = os.getenv('CGSP_HOST', 'localhost')
 PORT      = int(os.getenv('CGSP_PORT', '8081'))
 CGSP_USER = os.getenv('CGSP_USER', 'atacante1')
@@ -28,6 +29,8 @@ CANVAS_SIZE = 500
 
 class AtacanteCLI:
     def __init__(self, root):
+        """Configura ventana, estado local y socket TCP del cliente atacante.
+        Luego crea la UI y arranca la conexion inicial con AUTH."""
         self.root = root
         self.root.title("CyberDef - Cliente Atacante")
         self.root.geometry("700x760")
@@ -53,6 +56,8 @@ class AtacanteCLI:
         self.conectar_servidor()
 
     def setup_ui(self):
+        """Crea canvas, botones de acciones y panel de logs.
+        Tambien enlaza teclado y evento de cierre de ventana."""
         self.status_var = tk.StringVar(value="Desconectado")
         self.status_label = tk.Label(self.root, textvariable=self.status_var, font=("Arial", 12, "bold"), fg="red")
         self.status_label.pack(pady=10)
@@ -95,6 +100,8 @@ class AtacanteCLI:
         self.root.protocol("WM_DELETE_WINDOW", self.cerrar_conexion)
 
     def conectar_servidor(self):
+        """Resuelve HOST por DNS, conecta al servidor CGSP y actualiza estado visual.
+        Si conecta, inicia hilo receptor y envia comando AUTH con credenciales."""
         try:
             ip_servidor = socket.gethostbyname(HOST)
             self.client_socket.connect((ip_servidor, PORT))
@@ -119,6 +126,8 @@ class AtacanteCLI:
             self.log(f"Error de conexion: {e}")
 
     def handle_keypress(self, event):
+        """Traduce teclas W/A/S/D/V/X/T a movimiento o acciones de juego.
+        Ignora entrada de teclado cuando no hay conexion activa."""
         if not self.connected:
             return
         char = event.char.lower()
@@ -138,6 +147,8 @@ class AtacanteCLI:
             self.action_start()
 
     def move_player(self, dx, dy):
+        """Calcula nueva posicion dentro de limites 0..99 y redibuja el jugador.
+        Luego notifica al servidor con el comando MOVE <dx> <dy>."""
         if not self.connected:
             return
 
@@ -152,24 +163,30 @@ class AtacanteCLI:
         self.enviar_comando(f"MOVE {dx} {dy}")
 
     def action_scan(self):
+        """Envia SCAN para pedir recursos cercanos en la posicion actual."""
         if self.connected:
             self.enviar_comando("SCAN")
 
     def action_attack(self):
+        """Envia ATTACK sobre el recurso seleccionado en selected_resource_id."""
         if self.connected:
             self.enviar_comando(f"ATTACK {self.selected_resource_id}")
 
     def action_start(self):
+        """Lanza inicio manual de partida enviando START y registrando el intento."""
         if self.connected:
             self.log("[MANUAL] Enviando START...")
             self.enviar_comando("START")
 
     def _world_to_canvas(self, x, y):
+        """Convierte coordenadas logicas del mapa (0..99) a pixeles del canvas.
+        Usa escala lineal segun el tamano visual definido por CANVAS_SIZE."""
         scale_x = (CANVAS_SIZE - 1) / (MAP_WIDTH - 1)
         scale_y = (CANVAS_SIZE - 1) / (MAP_HEIGHT - 1)
         return int(round(x * scale_x)), int(round(y * scale_y))
 
     def actualizar_render(self):
+        """Reposiciona el ovalo del jugador en canvas con la coordenada actual x,y."""
         px, py = self._world_to_canvas(self.x, self.y)
         self.canvas.coords(
             self.player_id,
@@ -178,19 +195,16 @@ class AtacanteCLI:
         )
 
     def _parse_int(self, value, default=None):
+        """Convierte un valor a entero de forma segura.
+        Si falla por formato o tipo, retorna el valor default."""
         try:
             return int(value)
         except (TypeError, ValueError):
             return default
 
     def _fallback_resource_xy(self, resource_id):
-        """
-        Posición de fallback cuando el servidor no informó coordenadas.
-        IMPORTANTE: debe ser DETERMINÍSTICA (mismo resultado en todos los procesos)
-        para que dos instancias del cliente coincidan.  hash() NO sirve porque
-        Python 3.3+ lo aleatoriza por proceso (PYTHONHASHSEED).
-        Usamos aritmética modular sobre el resource_id.
-        """
+        """Genera coordenadas pseudo-deterministicas para un recurso sin x,y.
+        Esto evita que un recurso quede sin representacion visual en el mapa."""
         try:
             rid = int(resource_id)
         except (TypeError, ValueError):
@@ -200,6 +214,8 @@ class AtacanteCLI:
         return x, y
 
     def _upsert_resource(self, resource_id, x=None, y=None, attacked=None):
+        """Inserta o actualiza recurso en memoria local (coords y estado attacked).
+        Si no hay coordenadas, aplica fallback y luego redibuja el recurso."""
         resource = self.resources.get(resource_id, {})
 
         if x is not None and y is not None:
@@ -219,6 +235,8 @@ class AtacanteCLI:
         self._draw_resource(resource_id)
 
     def _draw_resource(self, resource_id):
+        """Crea o actualiza el rectangulo/etiqueta del recurso en el canvas.
+        Cambia color y borde segun si el recurso esta atacado o no."""
         resource = self.resources.get(resource_id)
         if not resource:
             return
@@ -260,6 +278,8 @@ class AtacanteCLI:
             self.canvas.itemconfig(label_id, text=f"R{resource_id}")
 
     def enviar_comando(self, command):
+        """Normaliza salto de linea, envia comando CGSP por socket y lo loggea.
+        Si ocurre error de envio, lo reporta en el panel de eventos."""
         if not command.endswith("\n"):
             command += "\n"
 
@@ -270,6 +290,8 @@ class AtacanteCLI:
             self.log(f"Error enviando datos: {e}")
 
     def recibir_eventos(self):
+        """Recibe stream del socket, acumula buffer y separa mensajes por linea.
+        Cada comando completo se delega a procesar_comando_cgsp."""
         while self.connected:
             try:
                 data = self.client_socket.recv(1024)
@@ -292,6 +314,8 @@ class AtacanteCLI:
         self.root.after(0, lambda: self.status_label.config(fg="red"))
 
     def procesar_comando_cgsp(self, comando: str):
+        """Parsea respuestas CGSP (OK/ROLE/EVENT/ERR) y sincroniza estado/UI.
+        Gestiona posicion, recursos, estado de partida y mensajes de error."""
         self.log(f"S->C: {comando}")
         partes = comando.split()
         if not partes:
@@ -376,25 +400,25 @@ class AtacanteCLI:
                 self.root.after(0, lambda: self.status_var.set("Servidor no disponible (ERR 503)"))
 
     def log(self, message):
+        """Escribe mensaje en consola y programa su insercion en la UI (thread-safe)."""
         print(message)
         self.root.after(0, lambda: self._append_log(message))
 
     def _intentar_start(self):
-        """Envía START al servidor. Si no hay suficientes jugadores (ERR 409)
-        el servidor responde error y el juego sigue en espera sin problema.
-        Si la partida ya fue iniciada por otro jugador, el ERR también es
-        inofensivo. El EVENT GAME_STARTED llega por broadcast cuando arranca."""
+        """Envio automatico de START usado por el temporizador de auto-inicio."""
         if self.connected:
             self.log("[AUTO] Enviando START para iniciar partida...")
             self.enviar_comando("START")
 
     def _append_log(self, message):
+        """Inserta una linea en el widget de log, hace autoscroll y bloquea edicion."""
         self.log_box.configure(state="normal")
         self.log_box.insert(tk.END, message + "\n")
         self.log_box.see(tk.END)
         self.log_box.configure(state="disabled")
 
     def cerrar_conexion(self):
+        """Intenta notificar QUIT, cierra el socket cliente y destruye la ventana."""
         if self.connected:
             try:
                 self.enviar_comando("QUIT")

@@ -1,4 +1,20 @@
+"""
+server_http.py - Servidor HTTP ligero y puente Web <-> CGSP.
+
+Este archivo expone endpoints para el cliente web (login, salas, stats,
+crear sala y unirse), administra sesiones en memoria y sirve archivos estaticos.
+
+Internamente actua como proxy de aplicacion:
+    1) Recibe peticiones HTTP.
+    2) Traduce acciones web a comandos CGSP (AUTH, LIST_ROOMS, JOIN, etc.).
+    3) Abre conexiones cortas al servidor de juego y devuelve respuestas en JSON.
+
+En resumen: conecta el frontend web con el servidor CGSP sin que el navegador
+hable TCP directo con el protocolo del juego.
+"""
+
 import json
+import hashlib
 import os
 import secrets
 import socket
@@ -17,6 +33,8 @@ SESSIONS = {}
 
 
 def send_response(client_socket, code, reason, body=b"", content_type="text/plain; charset=UTF-8"):
+    """Construye y envia una respuesta HTTP completa (cabeceras + cuerpo).
+    Acepta body en texto o bytes y fuerza cierre de conexion por solicitud."""
     if isinstance(body, str):
         body = body.encode("utf-8")
 
@@ -32,11 +50,14 @@ def send_response(client_socket, code, reason, body=b"", content_type="text/plai
 
 
 def send_json(client_socket, code, reason, payload):
+    """Serializa un payload a JSON UTF-8 y lo envia como respuesta HTTP."""
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     send_response(client_socket, code, reason, body, "application/json; charset=UTF-8")
 
 
 def read_http_request(client_socket):
+    """Lee una peticion HTTP cruda desde socket y retorna método, ruta,
+    headers y body respetando Content-Length para requests POST."""
     data = b""
     while b"\r\n\r\n" not in data:
         chunk = client_socket.recv(4096)
@@ -85,18 +106,22 @@ def read_http_request(client_socket):
 
 
 def parse_form_body(body_bytes):
+    """Parsea body x-www-form-urlencoded y devuelve dict plano clave->valor."""
     body_text = body_bytes.decode("utf-8", errors="ignore")
     raw_data = parse_qs(body_text, keep_blank_values=True)
     return {key: values[0] for key, values in raw_data.items()}
 
 
 def _send_line(sock, line):
+    """Envia una linea al servidor CGSP garantizando terminador '\\n'."""
     if not line.endswith("\n"):
         line += "\n"
     sock.sendall(line.encode("utf-8"))
 
 
 def _recv_lines(sock, idle_timeout=0.25, max_total=1.5):
+    """Recibe respuesta CGSP por ventanas de tiempo y la separa por lineas.
+    Se usa para comandos sin stream continuo en este proxy HTTP."""
     deadline = time.time() + max_total
     chunks = []
     sock.settimeout(idle_timeout)
@@ -118,6 +143,7 @@ def _recv_lines(sock, idle_timeout=0.25, max_total=1.5):
 
 
 def _parse_err(lines):
+    """Busca la primera linea ERR y devuelve (code, message) si existe."""
     for line in lines:
         if line.startswith("ERR "):
             parts = line.split(" ", 2)
@@ -128,6 +154,7 @@ def _parse_err(lines):
 
 
 def _parse_role(lines):
+    """Extrae el rol enviado por CGSP desde una linea 'ROLE ...'."""
     for line in lines:
         if line.startswith("ROLE "):
             role = line.split(" ", 1)[1].strip().upper()
@@ -136,10 +163,13 @@ def _parse_role(lines):
 
 
 def _role_to_ui(role):
+    """Mapea rol de protocolo (ATTACKER/DEFENDER) al texto usado por el frontend."""
     return "atacante" if role == "ATTACKER" else "defensor"
 
 
 def cgsp_session_commands(username, password, commands):
+    """Abre sesion corta contra CGSP, autentica con AUTH y ejecuta comandos.
+    Devuelve rol y salidas por comando o un error normalizado."""
     if " " in username or " " in password:
         return {"ok": False, "code": 400, "error": "Usuario/password no deben contener espacios"}
 
@@ -175,12 +205,14 @@ def cgsp_session_commands(username, password, commands):
 
 
 def _to_http_status(cgsp_code):
+    """Traduce codigos CGSP permitidos a HTTP; otros se convierten a 500."""
     if cgsp_code in (400, 401, 403, 404, 409, 503):
         return cgsp_code
     return 500
 
 
 def _new_session(username, password, role):
+    """Crea token de sesion web y guarda credenciales/rol en memoria protegida."""
     token = secrets.token_hex(16)
     with SESSIONS_LOCK:
         SESSIONS[token] = {
@@ -193,6 +225,7 @@ def _new_session(username, password, role):
 
 
 def _get_session(req, fields=None):
+    """Recupera sesion por token en header X-Session-Token o body de formulario."""
     token = req["headers"].get("x-session-token", "").strip()
     if not token and fields is not None:
         token = fields.get("session_token", "").strip()
@@ -270,7 +303,43 @@ def _parse_rooms(lines):
     return rooms
 
 
+def _rooms_signature(rooms):
+    """Genera una huella estable del estado de salas para detectar cambios."""
+    normalized = []
+    for room in rooms:
+        normalized.append(
+            {
+                "id": str(room.get("id", "")),
+                "status": room.get("status", "waiting"),
+                "max_players": int(room.get("max_players", 0)),
+                "players_connected": int(room.get("players_connected", 0)),
+                "attacker_count": int(room.get("attacker_count", 0)),
+                "defender_count": int(room.get("defender_count", 0)),
+            }
+        )
+    normalized.sort(key=lambda item: item["id"])
+    payload = json.dumps(normalized, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _fetch_rooms_for_session(session):
+    """Consulta LIST_ROOMS para una sesion y retorna (rooms, code, error)."""
+    response = cgsp_session_commands(session["username"], session["password"], ["LIST_ROOMS"])
+    if not response["ok"]:
+        return None, response["code"], response["error"]
+
+    lines = response["results"][0] if response["results"] else []
+    cmd_err = _parse_err(lines)
+    if cmd_err:
+        code, message = cmd_err
+        return None, code, message
+
+    return _parse_rooms(lines), None, None
+
+
 def handle_login(client_socket, req):
+    """Procesa login web: valida campos, autentica contra CGSP,
+    verifica rol opcional y responde con token de sesion."""
     fields = parse_form_body(req["body"])
     username = fields.get("username", "").strip()
     password = fields.get("password", "").strip()
@@ -312,26 +381,31 @@ def handle_login(client_socket, req):
 
 
 def handle_get_rooms(client_socket, req):
+    """Retorna listado de salas consultando LIST_ROOMS con la sesion activa."""
     session = _get_session(req)
     if session is None:
         send_json(client_socket, 401, "Unauthorized", {"ok": False, "error": "Sesion invalida o expirada"})
         return
 
-    response = cgsp_session_commands(session["username"], session["password"], ["LIST_ROOMS"])
-    if not response["ok"]:
-        code = _to_http_status(response["code"])
-        send_json(client_socket, code, "Error", {"ok": False, "error": response["error"]})
+    rooms, err_code, err_message = _fetch_rooms_for_session(session)
+    if rooms is None:
+        send_json(client_socket, _to_http_status(err_code), "Error", {"ok": False, "error": err_message})
         return
 
-    lines = response["results"][0] if response["results"] else []
-    cmd_err = _parse_err(lines)
-    if cmd_err:
-        code, message = cmd_err
-        send_json(client_socket, _to_http_status(code), "Error", {"ok": False, "error": message})
-        return
-
-    rooms = _parse_rooms(lines)
-    send_json(client_socket, 200, "OK", {"ok": True, "rooms": rooms})
+    active_rooms = len([r for r in rooms if r["status"] in ("waiting", "in_progress")])
+    players_online = sum(r["players_connected"] for r in rooms)
+    send_json(
+        client_socket,
+        200,
+        "OK",
+        {
+            "ok": True,
+            "rooms": rooms,
+            "signature": _rooms_signature(rooms),
+            "players_online": players_online,
+            "active_rooms": active_rooms,
+        },
+    )
 
 
 def handle_get_stats(client_socket, req):
@@ -351,18 +425,15 @@ def handle_get_stats(client_socket, req):
         })
         return
 
-    response = cgsp_session_commands(session["username"], session["password"], ["LIST_ROOMS"])
-    if not response["ok"]:
+    rooms, err_code, _err_message = _fetch_rooms_for_session(session)
+    if rooms is None:
         send_json(client_socket, 200, "OK", {
             "ok": True,
             "players_online": 0,
             "active_rooms": 0,
-            "note": "cgsp_unavailable"
+            "note": f"cgsp_unavailable_{err_code}"
         })
         return
-
-    lines = response["results"][0] if response["results"] else []
-    rooms = _parse_rooms(lines)
 
     active_rooms = len([r for r in rooms if r["status"] in ("waiting", "in_progress")])
     players_online = sum(r["players_connected"] for r in rooms)
@@ -375,6 +446,7 @@ def handle_get_stats(client_socket, req):
 
 
 def handle_create_room(client_socket, req):
+    """Crea una sala en CGSP con CREATE_ROOM y devuelve su metadata inicial."""
     fields = parse_form_body(req["body"])
     session = _get_session(req, fields)
     if session is None:
@@ -417,6 +489,8 @@ def handle_create_room(client_socket, req):
 
 
 def handle_join_room(client_socket, req):
+    """Hace JOIN a una sala y devuelve estado actualizado junto a
+    configuracion para abrir cliente desktop con las mismas credenciales."""
     fields = parse_form_body(req["body"])
     session = _get_session(req, fields)
     if session is None:
@@ -487,6 +561,8 @@ def handle_join_room(client_socket, req):
 
 
 def serve_static(client_socket, path):
+    """Sirve archivos estaticos del frontend con validacion basica de ruta
+    y deteccion simple de content-type por extension."""
     if path == "/":
         path = "/index.html"
 
@@ -515,6 +591,8 @@ def serve_static(client_socket, path):
 
 
 def handle_client(client_socket, addr):
+    """Despacha una conexion HTTP: parsea request, enruta endpoints API
+    y maneja errores de parseo/procesamiento con respuestas estandar."""
     print(f"[+] Nueva conexion HTTP: {addr}")
     try:
         request = read_http_request(client_socket)
@@ -557,6 +635,8 @@ def handle_client(client_socket, addr):
 
 
 def start_server():
+    """Inicia socket TCP HTTP, acepta clientes en bucle y atiende cada
+    conexion en un hilo daemon para manejo concurrente."""
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 

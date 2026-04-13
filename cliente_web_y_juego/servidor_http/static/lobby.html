@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lobby — CyberOps</title>
+    <title>CyberOps</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
@@ -166,11 +166,10 @@
 
     <!-- FOOTER -->
     <footer class="footer">
-        <span class="mono footer-copy">© 2025 Defensa de Recursos</span>
+        <span class="mono footer-copy">© 2026 Defensa de Recursos</span>
         <span class="footer-sep">·</span>
         <span>Arquitectura y Protocolos de Internet</span>
         <span class="footer-sep">·</span>
-        <span class="mono">Proyecto Universitario</span>
     </footer>
 
     <!-- Join modal -->
@@ -206,6 +205,7 @@
 
         let pendingRoom = null;
         let pollInterval = null;
+        let lastRoomsSignature = '';
 
         // ─── Inicializar UI de perfil ───────────────────────────────────────
         document.getElementById('nav-username').textContent = storedUser;
@@ -315,14 +315,16 @@
         }
 
         // ─── refreshRooms: llama /api/rooms y renderiza ─────────────────────
-        async function refreshRooms() {
+        async function refreshRooms(silent = false) {
             const icon = document.getElementById('refresh-icon');
             const btn = document.getElementById('refreshBtn');
             const loading = document.getElementById('roomsLoading');
 
-            if (btn) btn.disabled = true;
-            if (icon) icon.style.animation = 'spin 0.6s linear';
-            if (loading) loading.style.display = 'block';
+            if (!silent) {
+                if (btn) btn.disabled = true;
+                if (icon) icon.style.animation = 'spin 0.6s linear';
+                if (loading) loading.style.display = 'block';
+            }
 
             try {
                 const response = await fetch('/api/rooms', {
@@ -332,22 +334,34 @@
                 if (!response.ok || !Array.isArray(payload.rooms)) {
                     throw new Error(payload.error || 'Respuesta inválida de /api/rooms');
                 }
+
+                const signature = payload.signature || '';
+                if (signature && signature === lastRoomsSignature) {
+                    return;
+                }
+
+                if (signature) {
+                    lastRoomsSignature = signature;
+                }
+
                 renderRooms(payload.rooms);
             } catch (error) {
                 console.warn('refreshRooms error:', error);
                 showRoomsError('No se pudieron cargar las salas');
             } finally {
-                if (icon) setTimeout(() => { icon.style.animation = ''; }, 600);
-                if (btn) btn.disabled = false;
+                if (!silent) {
+                    if (icon) setTimeout(() => { icon.style.animation = ''; }, 600);
+                    if (btn) btn.disabled = false;
+                }
             }
         }
 
-        // ─── Polling automático cada 5 segundos ─────────────────────────────
+        // ─── Polling simple: consulta periodica y render solo si hubo cambios ─
         function startPolling() {
             if (pollInterval) clearInterval(pollInterval);
             pollInterval = setInterval(() => {
-                refreshRooms();
-            }, 5000);
+                refreshRooms(true);
+            }, 10000);
         }
 
         // ─── createRoom ─────────────────────────────────────────────────────
@@ -481,9 +495,12 @@
             if (e.key === 'Escape') closeModal();
         });
 
-        // ─── Inicio: cargar salas y arrancar polling ─────────────────────────
-        refreshRooms();
-        startPolling();
+        window.addEventListener('beforeunload', () => {
+            if (pollInterval) clearInterval(pollInterval);
+        });
+
+        // ─── Inicio: carga inicial + polling simple ──────────────────────────
+        refreshRooms().finally(() => startPolling());
     </script>
 </body>
 </html>

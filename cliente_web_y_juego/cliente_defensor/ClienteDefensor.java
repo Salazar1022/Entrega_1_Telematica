@@ -1,3 +1,17 @@
+/*
+ * ClienteDefensor.java - Cliente desktop del rol DEFENDER para CyberDef (CGSP).
+ *
+ * Este archivo implementa una interfaz Swing que permite:
+ *   1) Conectarse al servidor de juego por TCP.
+ *   2) Autenticarse con AUTH y unirse a una sala con JOIN.
+ *   3) Recibir y procesar eventos CGSP (inicio, ataques, defensa, fin de partida).
+ *   4) Mover al defensor en el mapa (W/A/S/D) y enviar DEFEND sobre el objetivo.
+ *   5) Mostrar estado, recursos y alertas en tiempo real en el canvas y el log.
+ *
+ * En resumen: este cliente es la aplicacion visual del jugador defensor,
+ * sincronizada con el servidor central mediante comandos CGSP de texto.
+ */
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
@@ -46,6 +60,10 @@ public class ClienteDefensor extends JFrame {
     private JLabel statusLabel;
     private DefaultListModel<String> logModel;
 
+    /**
+     * Inicializa la ventana del cliente defensor, construye la UI,
+     * conecta al servidor CGSP y registra el cierre ordenado de sesión.
+     */
     public ClienteDefensor() {
         super("CyberDef - Cliente Defensor");
         setSize(700, 760);
@@ -64,6 +82,10 @@ public class ClienteDefensor extends JFrame {
         });
     }
 
+    /**
+     * Construye todos los componentes visuales: estado, mapa, controles
+     * de movimiento/defensa, log en pantalla y atajos de teclado.
+     */
     private void setupUI() {
         // Status header
         statusLabel = new JLabel("Desconectado", SwingConstants.CENTER);
@@ -79,10 +101,6 @@ public class ClienteDefensor extends JFrame {
                 // Fondo oscuro
                 g.setColor(new Color(30, 30, 30));
                 g.fillRect(0, 0, getWidth(), getHeight());
-
-                // Dibujar límite (simulando las distancias de 0 a 100 x escala)
-                g.setColor(Color.BLUE);
-                g.drawRect(0, 0, CANVAS_SIZE - 1, CANVAS_SIZE - 1);
 
                 // Dibujar al defensor (Círculo Azul)
                 Point playerPixel = worldToCanvas(x, y);
@@ -115,8 +133,14 @@ public class ClienteDefensor extends JFrame {
                 }
             }
         };
+        canvas.setBackground(new Color(30, 30, 30));
         canvas.setPreferredSize(new Dimension(CANVAS_SIZE, CANVAS_SIZE));
-        add(canvas, BorderLayout.CENTER);
+        canvas.setMinimumSize(new Dimension(CANVAS_SIZE, CANVAS_SIZE));
+        canvas.setMaximumSize(new Dimension(CANVAS_SIZE, CANVAS_SIZE));
+
+        JPanel centerWrapper = new JPanel(new GridBagLayout());
+        centerWrapper.add(canvas);
+        add(centerWrapper, BorderLayout.CENTER);
 
         // Controles e info
         JPanel bottomPanel = new JPanel(new BorderLayout());
@@ -180,6 +204,10 @@ public class ClienteDefensor extends JFrame {
         requestFocusInWindow();
     }
 
+    /**
+     * Aplica movimiento local con límites del mapa, repinta el jugador
+     * y envía el comando MOVE al servidor cuando hay conexión activa.
+     */
     private void moverJugador(int dx, int dy) {
         if (!connected)
             return;
@@ -197,6 +225,10 @@ public class ClienteDefensor extends JFrame {
         enviarEstado("MOVE " + dx + " " + dy + "\n");
     }
 
+    /**
+     * Convierte coordenadas lógicas del mundo (0..99) a píxeles del canvas
+     * usando una escala lineal proporcional al tamaño visual del mapa.
+     */
     private Point worldToCanvas(int worldX, int worldY) {
         double scaleX = (double) (CANVAS_SIZE - 1) / (MAP_WIDTH - 1);
         double scaleY = (double) (CANVAS_SIZE - 1) / (MAP_HEIGHT - 1);
@@ -205,6 +237,10 @@ public class ClienteDefensor extends JFrame {
         return new Point(canvasX, canvasY);
     }
 
+    /**
+     * Selecciona el recurso a defender priorizando los que están bajo ataque;
+     * si no hay alertas, elige el recurso conocido más cercano y envía DEFEND.
+     */
     private void defenderRecursoObjetivo() {
         String selected = null;
         int bestDist2 = Integer.MAX_VALUE;
@@ -247,6 +283,10 @@ public class ClienteDefensor extends JFrame {
         logModel.add(0, "C->S: DEFEND " + selected);
     }
 
+    /**
+     * Resuelve DNS, abre socket TCP, prepara streams UTF-8 y arranca
+     * el hilo receptor; después inicia el handshake enviando AUTH.
+     */
     private void conectarServidor() {
         try {
             // Resolver DNS como exige la rúbrica
@@ -280,6 +320,9 @@ public class ClienteDefensor extends JFrame {
         }
     }
 
+    /**
+     * Envía un comando CGSP ya formateado al servidor por el stream de salida.
+     */
     private void enviarEstado(String mensaje) {
         if (out != null) {
             out.print(mensaje);
@@ -287,6 +330,10 @@ public class ClienteDefensor extends JFrame {
         }
     }
 
+    /**
+     * Recibe líneas del servidor de forma continua y delega su procesamiento
+     * al hilo gráfico (EDT) para actualizar UI sin condiciones de carrera.
+     */
     private void recibirEventos() {
         try {
             String linea;
@@ -309,6 +356,10 @@ public class ClienteDefensor extends JFrame {
         connected = false;
     }
 
+    /**
+     * Interpreta mensajes CGSP (OK/ROLE/EVENT/ERR), sincroniza estado local,
+     * actualiza mapa/log y refleja cambios de partida en la interfaz.
+     */
     private void procesarComandoCGSP(String comando) {
         // Mostrar en nuestro log visible
         logModel.add(0, "S->C: " + comando);
@@ -430,6 +481,9 @@ public class ClienteDefensor extends JFrame {
         }
     }
 
+    /**
+     * Convierte texto a entero y retorna fallback si el valor es inválido.
+     */
     private int parseSafeInt(String value, int fallback) {
         try {
             return Integer.parseInt(value);
@@ -438,6 +492,9 @@ public class ClienteDefensor extends JFrame {
         }
     }
 
+    /**
+     * Lee variable de entorno y aplica fallback cuando no existe o está vacía.
+     */
     private static String envOrDefault(String key, String fallback) {
         String value = System.getenv(key);
         if (value == null || value.trim().isEmpty()) {
@@ -446,6 +503,9 @@ public class ClienteDefensor extends JFrame {
         return value.trim();
     }
 
+    /**
+     * Obtiene un entero desde variable de entorno con validación segura.
+     */
     private static int parseIntEnv(String key, int fallback) {
         String value = System.getenv(key);
         if (value == null || value.trim().isEmpty()) {
@@ -458,6 +518,10 @@ public class ClienteDefensor extends JFrame {
         }
     }
 
+    /**
+     * Cierra la sesión del cliente: intenta enviar QUIT, libera streams/socket
+     * y finalmente destruye la ventana para terminar el proceso UI.
+     */
     private void cerrarConexion() {
         connected = false;
         try {
@@ -489,6 +553,9 @@ public class ClienteDefensor extends JFrame {
         dispose();
     }
 
+    /**
+     * Punto de entrada: crea y muestra la ventana Swing en el EDT.
+     */
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             ClienteDefensor client = new ClienteDefensor();

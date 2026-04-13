@@ -212,7 +212,6 @@ Entrega_1_Telematica/
 │
 ├── server/                           ← Servidor principal (C)
 │   ├── Makefile
-│   ├── identity_stub.py              ← Stub legacy (opcional para pruebas)
 │   ├── server.log                    ← Archivo de logs (generado al ejecutar)
 │   ├── include/
 │   │   ├── game_logic.h
@@ -261,3 +260,4 @@ make clean    # Limpiar archivos compilados
 ```
 
 El servidor requiere **gcc** y la flag `-pthread` (ya incluida en el Makefile).
+
