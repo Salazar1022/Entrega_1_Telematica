@@ -21,10 +21,7 @@
             <span class="logo-mark">⬡</span>
             <span class="logo-text">CyberOps</span>
         </div>
-        <div class="navbar__links">
-            <a href="#" class="nav-link">Protocolo</a>
-            <a href="#" class="nav-link">Rangos</a>
-        </div>
+
         <div class="navbar__status">
             <span class="status-dot status-dot--online"></span>
             <span class="status-label">Servidor activo</span>
@@ -37,11 +34,6 @@
         <!-- LEFT: Branding + stats -->
         <section class="hero-panel">
             <div class="hero-content">
-                <div class="hero-badge">
-                    <span class="mono">v2.1.4</span>
-                    <span class="badge-sep">|</span>
-                    <span>BETA MULTIJUGADOR</span>
-                </div>
                 <h1 class="hero-title">
                     Defensa<br>
                     <em>de Recursos</em>
@@ -50,23 +42,6 @@
                     Asume tu rol. Ataca la infraestructura o defiéndela.<br>
                     Cada decisión tiene consecuencias en tiempo real.
                 </p>
-
-                <div class="hero-stats">
-                    <div class="stat-item">
-                        <span class="stat-value mono" id="stat-players">—</span>
-                        <span class="stat-label">Jugadores online</span>
-                    </div>
-                    <div class="stat-divider"></div>
-                    <div class="stat-item">
-                        <span class="stat-value mono" id="stat-rooms">—</span>
-                        <span class="stat-label">Salas activas</span>
-                    </div>
-                    <div class="stat-divider"></div>
-                    <div class="stat-item">
-                        <span class="stat-value mono">99.2<span style="font-size:0.7em">%</span></span>
-                        <span class="stat-label">Uptime</span>
-                    </div>
-                </div>
 
                 <!-- Network art -->
                 <div class="network-art" aria-hidden="true">
@@ -188,11 +163,10 @@
 
     <!-- FOOTER -->
     <footer class="footer">
-        <span class="mono footer-copy">© 2025 Defensa de Recursos</span>
+        <span class="mono footer-copy">© 2026 Defensa de Recursos</span>
         <span class="footer-sep">·</span>
         <span>Arquitectura y Protocolos de Internet</span>
         <span class="footer-sep">·</span>
-        <span class="mono">Proyecto Universitario</span>
     </footer>
 
     <script>
@@ -201,22 +175,6 @@
             btn.classList.add('role-btn--active');
             document.getElementById('role').value = btn.dataset.role;
         }
-
-        function animateStat(id, target) {
-            const el = document.getElementById(id);
-            let current = 0;
-            const step = Math.ceil(target / 25);
-            const timer = setInterval(() => {
-                current = Math.min(current + step, target);
-                el.textContent = current;
-                if (current >= target) clearInterval(timer);
-            }, 45);
-        }
-
-        window.addEventListener('load', () => {
-            setTimeout(() => animateStat('stat-players', 7), 500);
-            setTimeout(() => animateStat('stat-rooms', 3), 700);
-        });
 
         function showLoginError(message) {
             const el = document.getElementById('loginError');
@@ -279,6 +237,7 @@
 
                 sessionStorage.setItem('co_username', payload.username);
                 sessionStorage.setItem('co_role', payload.role);
+                sessionStorage.setItem('co_session_token', payload.session_token || '');
                 window.location.href = 'lobby.html';
             } catch (error) {
                 showLoginError('No fue posible conectar con el servidor HTTP.');

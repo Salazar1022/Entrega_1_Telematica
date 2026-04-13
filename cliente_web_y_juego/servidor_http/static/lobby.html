@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lobby — CyberOps</title>
+    <title>CyberOps</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
@@ -23,8 +23,6 @@
         </div>
         <div class="navbar__links">
             <a href="#" class="nav-link nav-link--active">Lobby</a>
-            <a href="#" class="nav-link">Protocolo</a>
-            <a href="#" class="nav-link">Rangos</a>
         </div>
         <div class="navbar__user">
             <div class="user-pill">
@@ -53,34 +51,20 @@
             </div>
         </div>
 
-        <!-- Dashboard cards -->
-        <div class="dashboard-grid">
+        <!-- Dashboard cards — solo jugadores y salas (datos reales) -->
+        <div class="dashboard-grid" style="grid-template-columns: repeat(2, 1fr)">
             <div class="dash-card dash-card--blue">
                 <div class="dash-card__icon">⚡</div>
                 <div class="dash-card__info">
-                    <span class="dash-card__value mono" id="dc-players">7</span>
+                    <span class="dash-card__value mono" id="dc-players">—</span>
                     <span class="dash-card__label">Jugadores online</span>
                 </div>
             </div>
             <div class="dash-card dash-card--cyan">
                 <div class="dash-card__icon">◈</div>
                 <div class="dash-card__info">
-                    <span class="dash-card__value mono" id="dc-rooms">3</span>
+                    <span class="dash-card__value mono" id="dc-rooms">—</span>
                     <span class="dash-card__label">Salas activas</span>
-                </div>
-            </div>
-            <div class="dash-card dash-card--purple">
-                <div class="dash-card__icon">◉</div>
-                <div class="dash-card__info">
-                    <span class="dash-card__value mono">99.2%</span>
-                    <span class="dash-card__label">Uptime servidor</span>
-                </div>
-            </div>
-            <div class="dash-card dash-card--green">
-                <div class="dash-card__icon">▣</div>
-                <div class="dash-card__info">
-                    <span class="dash-card__value mono">14ms</span>
-                    <span class="dash-card__label">Latencia promedio</span>
                 </div>
             </div>
         </div>
@@ -95,103 +79,23 @@
                         <span class="section-title__indicator"></span>
                         Partidas Activas
                     </h2>
-                    <button class="btn-icon" onclick="refreshRooms()" title="Actualizar">
+                    <button class="btn-icon" id="refreshBtn" onclick="refreshRooms()" title="Actualizar">
                         <span id="refresh-icon">↻</span>
                         <span>Actualizar</span>
                     </button>
                 </div>
 
-                <div class="rooms-list" id="roomsList">
-                    <!-- Room 001 -->
-                    <div class="room-card">
-                        <div class="room-card__left">
-                            <div class="room-id mono">#001</div>
-                            <div class="room-details">
-                                <span class="room-name">Bosque Oscuro</span>
-                                <div class="room-meta">
-                                    <span class="room-status room-status--waiting">● Esperando</span>
-                                    <span class="room-players">
-                                        <span class="room-players__filled">1</span>
-                                        <span class="room-players__sep">/</span>
-                                        <span class="room-players__total">2</span>
-                                        jugadores
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="room-card__right">
-                            <div class="room-roles">
-                                <span class="role-slot role-slot--taken" title="Atacante ocupado">⚔</span>
-                                <span class="role-slot role-slot--open" title="Defensor libre">🛡</span>
-                            </div>
-                            <button class="btn-join" onclick="joinRoom('001')">
-                                Unirse →
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Room 002 -->
-                    <div class="room-card room-card--full">
-                        <div class="room-card__left">
-                            <div class="room-id mono">#002</div>
-                            <div class="room-details">
-                                <span class="room-name">Base Alpha</span>
-                                <div class="room-meta">
-                                    <span class="room-status room-status--active">● En progreso</span>
-                                    <span class="room-players">
-                                        <span class="room-players__filled">2</span>
-                                        <span class="room-players__sep">/</span>
-                                        <span class="room-players__total">2</span>
-                                        jugadores
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="room-card__right">
-                            <div class="room-roles">
-                                <span class="role-slot role-slot--taken" title="Atacante ocupado">⚔</span>
-                                <span class="role-slot role-slot--taken" title="Defensor ocupado">🛡</span>
-                            </div>
-                            <button class="btn-join btn-join--disabled" disabled>
-                                Llena
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Room 003 -->
-                    <div class="room-card">
-                        <div class="room-card__left">
-                            <div class="room-id mono">#003</div>
-                            <div class="room-details">
-                                <span class="room-name">Nodo Central</span>
-                                <div class="room-meta">
-                                    <span class="room-status room-status--waiting">● Esperando</span>
-                                    <span class="room-players">
-                                        <span class="room-players__filled">0</span>
-                                        <span class="room-players__sep">/</span>
-                                        <span class="room-players__total">2</span>
-                                        jugadores
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="room-card__right">
-                            <div class="room-roles">
-                                <span class="role-slot role-slot--open" title="Atacante libre">⚔</span>
-                                <span class="role-slot role-slot--open" title="Defensor libre">🛡</span>
-                            </div>
-                            <button class="btn-join" onclick="joinRoom('003')">
-                                Unirse →
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="rooms-empty" id="roomsEmpty" style="display:none">
-                        <span class="mono" style="color:var(--text-muted); font-size:0.85rem">
-                            — No hay partidas activas. Crea una nueva. —
-                        </span>
-                    </div>
+                <!-- IMPORTANTE: roomsEmpty y roomsLoading son HERMANOS de roomsList,
+                     NO hijos, para que innerHTML de roomsList no los destruya -->
+                <div id="roomsLoading" style="text-align:center; padding:2rem 0; color:var(--text-muted)">
+                    <span class="mono" style="font-size:0.85rem">Cargando salas...</span>
                 </div>
+                <div class="rooms-empty" id="roomsEmpty" style="display:none">
+                    <span class="mono" style="color:var(--text-muted); font-size:0.85rem">
+                        — No hay partidas activas. Crea una nueva. —
+                    </span>
+                </div>
+                <div class="rooms-list" id="roomsList"></div>
 
                 <button class="btn-create" onclick="createRoom()">
                     <span>+ Crear Nueva Partida</span>
@@ -221,27 +125,8 @@
                     </div>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="stat-block">
-                        <span class="stat-block__value mono">0</span>
-                        <span class="stat-block__label">Partidas jugadas</span>
-                    </div>
-                    <div class="stat-block">
-                        <span class="stat-block__value mono">0</span>
-                        <span class="stat-block__label">Victorias</span>
-                    </div>
-                    <div class="stat-block">
-                        <span class="stat-block__value mono">—</span>
-                        <span class="stat-block__label">K/D Ratio</span>
-                    </div>
-                    <div class="stat-block">
-                        <span class="stat-block__value mono">0</span>
-                        <span class="stat-block__label">Nivel</span>
-                    </div>
-                </div>
-
                 <!-- Server info -->
-                <div class="server-panel">
+                <div class="server-panel" id="serverPanel">
                     <div class="server-panel__header">
                         <span class="server-panel__title mono">Estado del Sistema</span>
                     </div>
@@ -281,11 +166,10 @@
 
     <!-- FOOTER -->
     <footer class="footer">
-        <span class="mono footer-copy">© 2025 Defensa de Recursos</span>
+        <span class="mono footer-copy">© 2026 Defensa de Recursos</span>
         <span class="footer-sep">·</span>
         <span>Arquitectura y Protocolos de Internet</span>
         <span class="footer-sep">·</span>
-        <span class="mono">Proyecto Universitario</span>
     </footer>
 
     <!-- Join modal -->
@@ -309,20 +193,30 @@
     <script>
         const storedUser = sessionStorage.getItem('co_username') || 'operador_01';
         const storedRole = sessionStorage.getItem('co_role') || 'atacante';
+        const sessionToken = sessionStorage.getItem('co_session_token') || '';
+
+        if (!sessionToken) {
+            window.location.href = 'index.html';
+        }
 
         const roleLabel = storedRole === 'defensor' ? 'Defensor' : 'Atacante';
         const roleIcon = storedRole === 'defensor' ? '🛡' : '⚔';
         const initials = storedUser.substring(0, 2).toUpperCase();
 
         let pendingRoom = null;
+        let pollInterval = null;
+        let lastRoomsSignature = '';
 
+        // ─── Inicializar UI de perfil ───────────────────────────────────────
         document.getElementById('nav-username').textContent = storedUser;
         document.getElementById('nav-role').textContent = roleLabel;
         document.getElementById('profile-username').textContent = storedUser;
         document.getElementById('profile-initials').textContent = initials;
-        document.getElementById('profile-role-badge').innerHTML = `<span class="role-icon-sm">${roleIcon}</span><span>${roleLabel}</span>`;
+        document.getElementById('profile-role-badge').innerHTML =
+            `<span class="role-icon-sm">${roleIcon}</span><span>${roleLabel}</span>`;
         if (storedRole === 'defensor') document.getElementById('nav-role').classList.add('user-role-tag--def');
 
+        // ─── Helpers de render ──────────────────────────────────────────────
         function roomStatusLabel(status) {
             if (status === 'in_progress') {
                 return '<span class="room-status room-status--active">● En progreso</span>';
@@ -340,26 +234,34 @@
         function renderRooms(rooms) {
             const container = document.getElementById('roomsList');
             const empty = document.getElementById('roomsEmpty');
+            const loading = document.getElementById('roomsLoading');
 
-            if (!rooms.length) {
+            // Ocultar spinner de carga
+            if (loading) loading.style.display = 'none';
+
+            if (!rooms || !rooms.length) {
                 container.innerHTML = '';
-                empty.style.display = 'block';
+                if (empty) empty.style.display = 'block';
                 return;
             }
 
-            empty.style.display = 'none';
+            if (empty) empty.style.display = 'none';
             container.innerHTML = rooms.map(room => {
                 const full = room.players_connected >= room.max_players;
                 const statusClass = full ? 'room-card room-card--full' : 'room-card';
                 const disabled = full || room.status === 'in_progress';
                 const btnClass = disabled ? 'btn-join btn-join--disabled' : 'btn-join';
-                const btnLabel = disabled ? (room.status === 'in_progress' ? 'En juego' : 'Llena') : 'Unirse →';
+                const btnLabel = disabled
+                    ? (room.status === 'in_progress' ? 'En juego' : 'Llena')
+                    : 'Unirse →';
                 const roomName = room.name || `Sala #${room.id}`;
+                const att = room.attacker_count || 0;
+                const def = room.defender_count || 0;
 
                 return `
                     <div class="${statusClass}">
                         <div class="room-card__left">
-                            <div class="room-id mono">#${room.id}</div>
+                            <div class="room-id mono">#${String(room.id).padStart(3,'0')}</div>
                             <div class="room-details">
                                 <span class="room-name">${roomName}</span>
                                 <div class="room-meta">
@@ -369,6 +271,9 @@
                                         <span class="room-players__sep">/</span>
                                         <span class="room-players__total">${room.max_players}</span>
                                         jugadores
+                                    </span>
+                                    <span class="room-players" style="font-size:0.75rem; color:var(--text-muted)">
+                                        ⚔ ${att} · 🛡 ${def}
                                     </span>
                                 </div>
                             </div>
@@ -386,56 +291,111 @@
                 `;
             }).join('');
 
-            document.getElementById('dc-rooms').textContent = String(rooms.length);
-            const totalPlayers = rooms.reduce((sum, room) => sum + room.players_connected, 0);
+            // Actualizar contadores del dashboard con datos reales
+            const totalRooms = rooms.filter(r => r.status === 'waiting' || r.status === 'in_progress').length;
+            const totalPlayers = rooms.reduce((sum, room) => sum + (room.players_connected || 0), 0);
+            document.getElementById('dc-rooms').textContent = String(totalRooms);
             document.getElementById('dc-players').textContent = String(totalPlayers);
         }
 
-        async function refreshRooms() {
+        function showRoomsError(message) {
+            const container = document.getElementById('roomsList');
+            const loading = document.getElementById('roomsLoading');
+            const empty = document.getElementById('roomsEmpty');
+            if (loading) loading.style.display = 'none';
+            if (empty) empty.style.display = 'none';
+            container.innerHTML = `
+                <div style="text-align:center; padding:1.5rem 0; color:#ef4444">
+                    <span class="mono" style="font-size:0.82rem">
+                        ⚠ ${message}<br>
+                        <span style="color:var(--text-muted)">Verifica que el servidor CGSP esté activo en el puerto 8081</span>
+                    </span>
+                </div>
+            `;
+        }
+
+        // ─── refreshRooms: llama /api/rooms y renderiza ─────────────────────
+        async function refreshRooms(silent = false) {
             const icon = document.getElementById('refresh-icon');
-            icon.style.animation = 'spin 0.6s linear';
+            const btn = document.getElementById('refreshBtn');
+            const loading = document.getElementById('roomsLoading');
+
+            if (!silent) {
+                if (btn) btn.disabled = true;
+                if (icon) icon.style.animation = 'spin 0.6s linear';
+                if (loading) loading.style.display = 'block';
+            }
 
             try {
-                const response = await fetch('/api/rooms');
+                const response = await fetch('/api/rooms', {
+                    headers: { 'X-Session-Token': sessionToken }
+                });
                 const payload = await response.json();
                 if (!response.ok || !Array.isArray(payload.rooms)) {
-                    throw new Error('Respuesta invalida de /api/rooms');
+                    throw new Error(payload.error || 'Respuesta inválida de /api/rooms');
                 }
+
+                const signature = payload.signature || '';
+                if (signature && signature === lastRoomsSignature) {
+                    return;
+                }
+
+                if (signature) {
+                    lastRoomsSignature = signature;
+                }
+
                 renderRooms(payload.rooms);
             } catch (error) {
-                console.error(error);
-                alert('No se pudieron cargar las salas. Verifica que el servidor HTTP esté activo.');
+                console.warn('refreshRooms error:', error);
+                showRoomsError('No se pudieron cargar las salas');
             } finally {
-                setTimeout(() => { icon.style.animation = ''; }, 600);
+                if (!silent) {
+                    if (icon) setTimeout(() => { icon.style.animation = ''; }, 600);
+                    if (btn) btn.disabled = false;
+                }
             }
         }
 
+        // ─── Polling simple: consulta periodica y render solo si hubo cambios ─
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(() => {
+                refreshRooms(true);
+            }, 10000);
+        }
+
+        // ─── createRoom ─────────────────────────────────────────────────────
         async function createRoom() {
             const btn = document.querySelector('.btn-create');
-            const original = btn.textContent;
-            btn.textContent = 'Creando sala...';
+            const original = btn.innerHTML;
+            btn.innerHTML = '<span>Creando sala...</span>';
             btn.disabled = true;
 
             try {
                 const body = new URLSearchParams({ name: `Sala de ${storedUser}` });
                 const response = await fetch('/api/create-room', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Session-Token': sessionToken
+                    },
                     body: body.toString()
                 });
                 const payload = await response.json();
                 if (!response.ok || !payload.ok) {
                     throw new Error(payload.error || `Error HTTP ${response.status}`);
                 }
+                // Refrescar inmediatamente tras crear
                 await refreshRooms();
             } catch (error) {
                 alert(error.message || 'No se pudo crear la sala.');
             } finally {
-                btn.textContent = original;
+                btn.innerHTML = original;
                 btn.disabled = false;
             }
         }
 
+        // ─── joinRoom / modal ────────────────────────────────────────────────
         function joinRoom(id) {
             pendingRoom = id;
             document.getElementById('modal-room-name').textContent = 'Sala #' + id;
@@ -449,10 +409,11 @@
         }
 
         async function confirmJoin() {
-            if (!pendingRoom) {
-                closeModal();
-                return;
-            }
+            if (!pendingRoom) { closeModal(); return; }
+
+            const confirmBtn = document.querySelector('.modal-confirm');
+            confirmBtn.textContent = 'Uniéndose...';
+            confirmBtn.disabled = true;
 
             try {
                 const body = new URLSearchParams({
@@ -463,7 +424,10 @@
 
                 const response = await fetch('/api/join-room', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Session-Token': sessionToken
+                    },
                     body: body.toString()
                 });
 
@@ -474,9 +438,56 @@
 
                 closeModal();
                 await refreshRooms();
-                alert(`Te uniste a la sala #${payload.room.id}. Ahora puedes abrir tu cliente desktop.`);
+
+                // Mostrar panel de éxito con config desktop
+                if (payload.desktop_config) {
+                    const c = payload.desktop_config;
+                    const isPython = storedRole !== 'defensor';
+                    const clientFile = isPython
+                        ? 'cliente_web_y_juego\\cliente_atacante\\cliente_atacante.py'
+                        : 'cd cliente_web_y_juego\\cliente_defensor && javac ClienteDefensor.java && java ClienteDefensor';
+
+                    const envVars = [
+                        `$env:CGSP_HOST="${c.host}"`,
+                        `$env:CGSP_PORT="${c.port}"`,
+                        `$env:CGSP_USER="${c.username}"`,
+                        `$env:CGSP_PASS="${c.password}"`,
+                        `$env:CGSP_ROOM="${c.room_id}"`
+                    ].join('\n');
+
+                    const launchCmd = isPython
+                        ? `${envVars}\npython ${clientFile}`
+                        : `${envVars}\n${clientFile}`;
+
+                    const serverPanel = document.getElementById('serverPanel');
+                    if (serverPanel) {
+                        serverPanel.innerHTML = `
+                            <div class="server-panel__header">
+                                <span class="server-panel__title mono" style="color:#22c55e">✓ En Sala #${c.room_id}</span>
+                            </div>
+                            <p style="font-size:0.78rem; color:var(--text-muted); margin:0.5rem 0">
+                                ${payload.started ? '🟢 Partida iniciada' : '🟡 ' + (payload.start_message || 'Inicio manual desde cliente desktop')}
+                            </p>
+                            <p style="font-size:0.78rem; color:var(--text-muted); margin:0.5rem 0">Lanza tu cliente desktop (PowerShell):</p>
+                            <pre id="desktop-config-pre" style="background:#0f172a; color:#67e8f9; font-size:0.72rem; padding:0.75rem; border-radius:8px; overflow:auto; margin:0.5rem 0; white-space:pre-wrap; border:1px solid #1e3a5f; cursor:pointer" title="Clic para copiar">${launchCmd}</pre>
+                            <p style="font-size:0.72rem; color:var(--text-muted); margin:0">Clic en el bloque para copiar</p>
+                        `;
+                        document.getElementById('desktop-config-pre').addEventListener('click', () => {
+                            navigator.clipboard.writeText(launchCmd).then(() => {
+                                document.getElementById('desktop-config-pre').style.borderColor = '#22c55e';
+                                setTimeout(() => {
+                                    const pre = document.getElementById('desktop-config-pre');
+                                    if (pre) pre.style.borderColor = '#1e3a5f';
+                                }, 1500);
+                            });
+                        });
+                    }
+                }
             } catch (error) {
                 alert(error.message || 'No fue posible unirse a la sala.');
+            } finally {
+                confirmBtn.textContent = 'Confirmar →';
+                confirmBtn.disabled = false;
             }
         }
 
@@ -484,7 +495,12 @@
             if (e.key === 'Escape') closeModal();
         });
 
-        refreshRooms();
+        window.addEventListener('beforeunload', () => {
+            if (pollInterval) clearInterval(pollInterval);
+        });
+
+        // ─── Inicio: carga inicial + polling simple ──────────────────────────
+        refreshRooms().finally(() => startPolling());
     </script>
 </body>
 </html>

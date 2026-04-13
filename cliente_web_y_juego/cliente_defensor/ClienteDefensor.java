@@ -1,3 +1,17 @@
+/*
+ * ClienteDefensor.java - Cliente desktop del rol DEFENDER para CyberDef (CGSP).
+ *
+ * Este archivo implementa una interfaz Swing que permite:
+ *   1) Conectarse al servidor de juego por TCP.
+ *   2) Autenticarse con AUTH y unirse a una sala con JOIN.
+ *   3) Recibir y procesar eventos CGSP (inicio, ataques, defensa, fin de partida).
+ *   4) Mover al defensor en el mapa (W/A/S/D) y enviar DEFEND sobre el objetivo.
+ *   5) Mostrar estado, recursos y alertas en tiempo real en el canvas y el log.
+ *
+ * En resumen: este cliente es la aplicacion visual del jugador defensor,
+ * sincronizada con el servidor central mediante comandos CGSP de texto.
+ */
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
@@ -16,8 +30,15 @@ import java.util.Map;
 import java.util.Set;
 
 public class ClienteDefensor extends JFrame {
-    private static final String HOST = "localhost";
-    private static final int PORT = 8081;
+    private static final int MAP_WIDTH = 100;
+    private static final int MAP_HEIGHT = 100;
+    private static final int CANVAS_SIZE = 500;
+
+    private static final String HOST = envOrDefault("CGSP_HOST", "localhost");
+    private static final int PORT = parseIntEnv("CGSP_PORT", 8081);
+    private static final String CGSP_USER = envOrDefault("CGSP_USER", "defensor1");
+    private static final String CGSP_PASS = envOrDefault("CGSP_PASS", "pass123");
+    private static final String CGSP_ROOM = envOrDefault("CGSP_ROOM", "1");
 
     private Socket socket;
     private PrintWriter out;
@@ -26,8 +47,8 @@ public class ClienteDefensor extends JFrame {
     private String estado = "CONECTADO";
 
     // Variables del jugador
-    private int x = 400; // Posición inicial
-    private int y = 400;
+    private int x = 0; // Coordenadas lógicas del servidor (0..99)
+    private int y = 0;
     private int step = 10;
     private final int playerSize = 15;
     private final int resourceSize = 8;
@@ -39,9 +60,13 @@ public class ClienteDefensor extends JFrame {
     private JLabel statusLabel;
     private DefaultListModel<String> logModel;
 
+    /**
+     * Inicializa la ventana del cliente defensor, construye la UI,
+     * conecta al servidor CGSP y registra el cierre ordenado de sesión.
+     */
     public ClienteDefensor() {
         super("CyberDef - Cliente Defensor");
-        setSize(600, 650);
+        setSize(700, 760);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setResizable(false);
         setLayout(new BorderLayout());
@@ -57,6 +82,10 @@ public class ClienteDefensor extends JFrame {
         });
     }
 
+    /**
+     * Construye todos los componentes visuales: estado, mapa, controles
+     * de movimiento/defensa, log en pantalla y atajos de teclado.
+     */
     private void setupUI() {
         // Status header
         statusLabel = new JLabel("Desconectado", SwingConstants.CENTER);
@@ -73,42 +102,49 @@ public class ClienteDefensor extends JFrame {
                 g.setColor(new Color(30, 30, 30));
                 g.fillRect(0, 0, getWidth(), getHeight());
 
-                // Dibujar límite (simulando las distancias de 0 a 100 x escala)
-                g.setColor(Color.BLUE);
-                g.drawRect(0, 0, 500 - 1, 500 - 1);
-
                 // Dibujar al defensor (Círculo Azul)
+                Point playerPixel = worldToCanvas(x, y);
                 g.setColor(Color.CYAN);
-                g.fillOval(x - playerSize, y - playerSize, playerSize * 2, playerSize * 2);
+                g.fillOval(playerPixel.x - playerSize, playerPixel.y - playerSize, playerSize * 2, playerSize * 2);
                 g.setColor(Color.WHITE);
-                g.drawOval(x - playerSize, y - playerSize, playerSize * 2, playerSize * 2);
+                g.drawOval(playerPixel.x - playerSize, playerPixel.y - playerSize, playerSize * 2, playerSize * 2);
 
                 // Dibujar recursos críticos y marcar los que están bajo ataque.
                 for (Map.Entry<String, Point> entry : resourcePositions.entrySet()) {
                     String resourceId = entry.getKey();
                     Point p = entry.getValue();
+                    Point resourcePixel = worldToCanvas(p.x, p.y);
                     boolean attacked = attackedResources.contains(resourceId);
 
                     Color fill = attacked ? new Color(220, 38, 38) : new Color(34, 197, 94);
                     Color outline = attacked ? new Color(127, 29, 29) : new Color(20, 83, 45);
 
                     g.setColor(fill);
-                    g.fillRect(p.x - resourceSize, p.y - resourceSize, resourceSize * 2, resourceSize * 2);
+                    g.fillRect(resourcePixel.x - resourceSize, resourcePixel.y - resourceSize, resourceSize * 2,
+                            resourceSize * 2);
                     g.setColor(outline);
-                    g.drawRect(p.x - resourceSize, p.y - resourceSize, resourceSize * 2, resourceSize * 2);
+                    g.drawRect(resourcePixel.x - resourceSize, resourcePixel.y - resourceSize, resourceSize * 2,
+                            resourceSize * 2);
 
                     g.setColor(Color.WHITE);
                     g.setFont(new Font("Consolas", Font.BOLD, 11));
-                    g.drawString("R" + resourceId, p.x - resourceSize, p.y - (resourceSize + 4));
+                    g.drawString("R" + resourceId, resourcePixel.x - resourceSize,
+                            resourcePixel.y - (resourceSize + 4));
                 }
             }
         };
-        canvas.setPreferredSize(new Dimension(500, 500));
-        add(canvas, BorderLayout.CENTER);
+        canvas.setBackground(new Color(30, 30, 30));
+        canvas.setPreferredSize(new Dimension(CANVAS_SIZE, CANVAS_SIZE));
+        canvas.setMinimumSize(new Dimension(CANVAS_SIZE, CANVAS_SIZE));
+        canvas.setMaximumSize(new Dimension(CANVAS_SIZE, CANVAS_SIZE));
+
+        JPanel centerWrapper = new JPanel(new GridBagLayout());
+        centerWrapper.add(canvas);
+        add(centerWrapper, BorderLayout.CENTER);
 
         // Controles e info
         JPanel bottomPanel = new JPanel(new BorderLayout());
-        JLabel tutorial = new JLabel("Controles: W,A,S,D (Mover), F (Defender Recurso 0)");
+        JLabel tutorial = new JLabel("Controles: W,A,S,D (Mover), F (Defender recurso atacado mas cercano)");
         tutorial.setHorizontalAlignment(SwingConstants.CENTER);
         bottomPanel.add(tutorial, BorderLayout.NORTH);
 
@@ -117,13 +153,13 @@ public class ClienteDefensor extends JFrame {
         JButton leftBtn = new JButton("A");
         JButton downBtn = new JButton("S");
         JButton rightBtn = new JButton("D");
-        JButton defendBtn = new JButton("DEFEND 0");
+        JButton defendBtn = new JButton("DEFEND AUTO");
 
         upBtn.addActionListener(e -> moverJugador(0, -step));
         leftBtn.addActionListener(e -> moverJugador(-step, 0));
         downBtn.addActionListener(e -> moverJugador(0, step));
         rightBtn.addActionListener(e -> moverJugador(step, 0));
-        defendBtn.addActionListener(e -> enviarEstado("DEFEND 0\n"));
+        defendBtn.addActionListener(e -> defenderRecursoObjetivo());
 
         controlsPanel.add(upBtn);
         controlsPanel.add(leftBtn);
@@ -157,7 +193,7 @@ public class ClienteDefensor extends JFrame {
                 } else if (c == 'd') {
                     moverJugador(step, 0);
                 } else if (c == 'f') {
-                    enviarEstado("DEFEND 0\n");
+                    defenderRecursoObjetivo();
                     return;
                 } // Botón DEFEND para CGSP
             }
@@ -168,19 +204,89 @@ public class ClienteDefensor extends JFrame {
         requestFocusInWindow();
     }
 
+    /**
+     * Aplica movimiento local con límites del mapa, repinta el jugador
+     * y envía el comando MOVE al servidor cuando hay conexión activa.
+     */
     private void moverJugador(int dx, int dy) {
         if (!connected)
             return;
 
-        // Prevenir salir del mapa (0-500 en la GUI)
-        if (x + dx >= 0 && x + dx <= 500 && y + dy >= 0 && y + dy <= 500) {
-            x += dx;
-            y += dy;
-            canvas.repaint();
-            enviarEstado("MOVE " + dx + " " + dy + "\n");
+        int newX = Math.max(0, Math.min(MAP_WIDTH - 1, x + dx));
+        int newY = Math.max(0, Math.min(MAP_HEIGHT - 1, y + dy));
+
+        if (newX == x && newY == y) {
+            return;
         }
+
+        x = newX;
+        y = newY;
+        canvas.repaint();
+        enviarEstado("MOVE " + dx + " " + dy + "\n");
     }
 
+    /**
+     * Convierte coordenadas lógicas del mundo (0..99) a píxeles del canvas
+     * usando una escala lineal proporcional al tamaño visual del mapa.
+     */
+    private Point worldToCanvas(int worldX, int worldY) {
+        double scaleX = (double) (CANVAS_SIZE - 1) / (MAP_WIDTH - 1);
+        double scaleY = (double) (CANVAS_SIZE - 1) / (MAP_HEIGHT - 1);
+        int canvasX = (int) Math.round(worldX * scaleX);
+        int canvasY = (int) Math.round(worldY * scaleY);
+        return new Point(canvasX, canvasY);
+    }
+
+    /**
+     * Selecciona el recurso a defender priorizando los que están bajo ataque;
+     * si no hay alertas, elige el recurso conocido más cercano y envía DEFEND.
+     */
+    private void defenderRecursoObjetivo() {
+        String selected = null;
+        int bestDist2 = Integer.MAX_VALUE;
+
+        // Priorizar recursos actualmente bajo ataque.
+        for (String resourceId : attackedResources) {
+            Point p = resourcePositions.get(resourceId);
+            if (p == null) {
+                continue;
+            }
+
+            int dx = p.x - x;
+            int dy = p.y - y;
+            int dist2 = dx * dx + dy * dy;
+            if (dist2 < bestDist2) {
+                bestDist2 = dist2;
+                selected = resourceId;
+            }
+        }
+
+        // Fallback: si no hay eventos ATTACK, usar el recurso conocido mas cercano.
+        if (selected == null) {
+            for (Map.Entry<String, Point> entry : resourcePositions.entrySet()) {
+                Point p = entry.getValue();
+                int dx = p.x - x;
+                int dy = p.y - y;
+                int dist2 = dx * dx + dy * dy;
+                if (dist2 < bestDist2) {
+                    bestDist2 = dist2;
+                    selected = entry.getKey();
+                }
+            }
+        }
+
+        if (selected == null) {
+            selected = "0";
+        }
+
+        enviarEstado("DEFEND " + selected + "\n");
+        logModel.add(0, "C->S: DEFEND " + selected);
+    }
+
+    /**
+     * Resuelve DNS, abre socket TCP, prepara streams UTF-8 y arranca
+     * el hilo receptor; después inicia el handshake enviando AUTH.
+     */
     private void conectarServidor() {
         try {
             // Resolver DNS como exige la rúbrica
@@ -190,7 +296,8 @@ public class ClienteDefensor extends JFrame {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
             connected = true;
 
-            statusLabel.setText("CGSP Socket IP: " + address.getHostAddress() + ":" + PORT);
+            statusLabel.setText("CGSP Socket IP: " + address.getHostAddress() + ":" + PORT + " | usuario=" + CGSP_USER
+                    + " sala=" + CGSP_ROOM);
             statusLabel.setForeground(new Color(0, 150, 0));
 
             // Loggeo en consola visual
@@ -202,7 +309,7 @@ public class ClienteDefensor extends JFrame {
             rxThread.start();
 
             // Máquina de estados: Enviar autenticación
-            enviarEstado("AUTH defensor1 seg2026\n");
+            enviarEstado("AUTH " + CGSP_USER + " " + CGSP_PASS + "\n");
 
         } catch (UnknownHostException e) {
             statusLabel.setText("Fallo resolución DNS de " + HOST);
@@ -213,6 +320,9 @@ public class ClienteDefensor extends JFrame {
         }
     }
 
+    /**
+     * Envía un comando CGSP ya formateado al servidor por el stream de salida.
+     */
     private void enviarEstado(String mensaje) {
         if (out != null) {
             out.print(mensaje);
@@ -220,10 +330,14 @@ public class ClienteDefensor extends JFrame {
         }
     }
 
+    /**
+     * Recibe líneas del servidor de forma continua y delega su procesamiento
+     * al hilo gráfico (EDT) para actualizar UI sin condiciones de carrera.
+     */
     private void recibirEventos() {
         try {
             String linea;
-            // Lee línea por línea gracias al \n en UTF-8 como requiere CGSP v1.0
+            // Lee línea por línea gracias al \n en UTF-8 como requiere CGSP v2.0
             while (connected && (linea = in.readLine()) != null) {
                 if (linea.trim().isEmpty())
                     continue;
@@ -242,6 +356,10 @@ public class ClienteDefensor extends JFrame {
         connected = false;
     }
 
+    /**
+     * Interpreta mensajes CGSP (OK/ROLE/EVENT/ERR), sincroniza estado local,
+     * actualiza mapa/log y refleja cambios de partida en la interfaz.
+     */
     private void procesarComandoCGSP(String comando) {
         // Mostrar en nuestro log visible
         logModel.add(0, "S->C: " + comando);
@@ -254,11 +372,26 @@ public class ClienteDefensor extends JFrame {
         if (c.equals("OK")) {
             if (comando.contains("Bienvenido")) {
                 estado = "AUTENTICADO";
+            } else if (partes.length >= 4 && partes[1].startsWith("Posicion")) {
+                int serverX = parseSafeInt(partes[2], x);
+                int serverY = parseSafeInt(partes[3], y);
+                x = Math.max(0, Math.min(MAP_WIDTH - 1, serverX));
+                y = Math.max(0, Math.min(MAP_HEIGHT - 1, serverY));
+                canvas.repaint();
             }
         } else if (c.equals("ROLE")) {
             estado = "AUTENTICADO";
-            // Una vez logueado, simula unirse a la sala
-            enviarEstado("JOIN 3\n");
+            // El defensor solo hace JOIN y espera EVENT GAME_STARTED.
+            // El START lo envía el atacante con un delay para dar tiempo
+            // a que todos (incluido el 2do defensor) se unan primero.
+            new Thread(() -> {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                }
+                SwingUtilities.invokeLater(() -> enviarEstado("JOIN " + CGSP_ROOM + "\n"));
+                // NO se envía START aquí. El atacante lo hará tras 5 segundos.
+            }).start();
         } else if (c.equals("EVENT")) {
             if (partes.length < 2)
                 return;
@@ -272,8 +405,8 @@ public class ClienteDefensor extends JFrame {
                 case "RESOURCE_INFO":
                     // El servidor nos da info de los recursos críticos al iniciar
                     if (partes.length >= 5) {
-                        int rx = parseSafeInt(partes[3], 0);
-                        int ry = parseSafeInt(partes[4], 0);
+                        int rx = Math.max(0, Math.min(MAP_WIDTH - 1, parseSafeInt(partes[3], 0)));
+                        int ry = Math.max(0, Math.min(MAP_HEIGHT - 1, parseSafeInt(partes[4], 0)));
                         resourcePositions.put(partes[2], new Point(rx, ry));
                         attackedResources.remove(partes[2]);
                         canvas.repaint();
@@ -299,6 +432,32 @@ public class ClienteDefensor extends JFrame {
                     }
                     logModel.add(0, "Exito: Defensa aplicada.");
                     break;
+                case "ATTACK_TIMEOUT":
+                    // RFC_v2: recurso comprometido por expiración del timer de 30 s
+                    if (partes.length >= 3) {
+                        String resId = partes[2];
+                        attackedResources.add(resId); // Quedarse rojo en el mapa
+                        canvas.repaint();
+                        logModel.add(0, "[!!] RECURSO " + resId + " COMPROMETIDO: timer de ataque expiró (30s)");
+                    } else {
+                        logModel.add(0, "[!!] ATAQUE SIN DEFENDER: timer expirado");
+                    }
+                    statusLabel.setText("RECURSO COMPROMETIDO - SIN DEFENSA A TIEMPO");
+                    statusLabel.setForeground(new Color(255, 140, 0));
+                    break;
+                case "GAME_OVER":
+                    String ganador = partes.length >= 3 ? partes[2] : "?";
+                    if ("DEFENDER".equals(ganador)) {
+                        statusLabel.setText("VICTORIA: Todos los ataques fueron repelidos (DEFENDER)");
+                        statusLabel.setForeground(new Color(34, 197, 94));
+                        logModel.add(0, "[GAME OVER] VICTORIA del equipo DEFENSOR");
+                    } else {
+                        statusLabel.setText("DERROTA: Un recurso fue comprometido (ATTACKER WINS)");
+                        statusLabel.setForeground(new Color(220, 38, 38));
+                        logModel.add(0, "[GAME OVER] Victoria del equipo ATACANTE");
+                    }
+                    connected = false;
+                    break;
             }
         } else if (c.equals("ERR")) {
             String code = partes.length > 1 ? partes[1] : "?";
@@ -308,6 +467,12 @@ public class ClienteDefensor extends JFrame {
                 statusLabel.setText("No autorizado (ERR 401)");
             } else if (code.equals("403")) {
                 statusLabel.setText("Accion prohibida (ERR 403)");
+            } else if (code.equals("408")) {
+                // Timeout de inactividad (RFC_v2): conexión cerrada por el servidor
+                connected = false;
+                statusLabel.setText("Sesion cerrada por inactividad (ERR 408)");
+                statusLabel.setForeground(new Color(255, 140, 0));
+                logModel.add(0, "[ERR 408] El servidor cerró la conexión por inactividad");
             } else if (code.equals("409")) {
                 statusLabel.setText("Conflicto de estado (ERR 409)");
             } else if (code.equals("503")) {
@@ -316,6 +481,9 @@ public class ClienteDefensor extends JFrame {
         }
     }
 
+    /**
+     * Convierte texto a entero y retorna fallback si el valor es inválido.
+     */
     private int parseSafeInt(String value, int fallback) {
         try {
             return Integer.parseInt(value);
@@ -324,6 +492,36 @@ public class ClienteDefensor extends JFrame {
         }
     }
 
+    /**
+     * Lee variable de entorno y aplica fallback cuando no existe o está vacía.
+     */
+    private static String envOrDefault(String key, String fallback) {
+        String value = System.getenv(key);
+        if (value == null || value.trim().isEmpty()) {
+            return fallback;
+        }
+        return value.trim();
+    }
+
+    /**
+     * Obtiene un entero desde variable de entorno con validación segura.
+     */
+    private static int parseIntEnv(String key, int fallback) {
+        String value = System.getenv(key);
+        if (value == null || value.trim().isEmpty()) {
+            return fallback;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    /**
+     * Cierra la sesión del cliente: intenta enviar QUIT, libera streams/socket
+     * y finalmente destruye la ventana para terminar el proceso UI.
+     */
     private void cerrarConexion() {
         connected = false;
         try {
@@ -355,6 +553,9 @@ public class ClienteDefensor extends JFrame {
         dispose();
     }
 
+    /**
+     * Punto de entrada: crea y muestra la ventana Swing en el EDT.
+     */
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             ClienteDefensor client = new ClienteDefensor();

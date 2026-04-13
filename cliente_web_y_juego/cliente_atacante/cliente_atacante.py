@@ -1,27 +1,50 @@
+""" 
+Configuración del servidor de juego (via variables de entorno o defaults)
+
+ Usuarios de prueba (deben coincidir con el servicio de identidad):
+   atacante1 / pass123  → ATTACKER
+   hacker    / hack2026 → ATTACKER
+   admin     / admin    → ATTACKER
+
+  Uso:
+  $env:CGSP_USER="atacante1"; $env:CGSP_PASS="pass123"; python cliente_atacante.py
+"""
+
 import socket
 import threading
 import tkinter as tk
+import os
 from tkinter import scrolledtext
 
-# Configuración del servidor de juego
-HOST = 'localhost' # Requisito 3: No usar IP quemada, resolver por DNS
-PORT = 8081
+HOST      = os.getenv('CGSP_HOST', 'localhost')
+PORT      = int(os.getenv('CGSP_PORT', '8081'))
+CGSP_USER = os.getenv('CGSP_USER', 'atacante1')
+CGSP_PASS = os.getenv('CGSP_PASS', 'pass123')
+CGSP_ROOM = os.getenv('CGSP_ROOM', '1')
+CGSP_AUTO_START = os.getenv('CGSP_AUTO_START', '0').strip().lower() in ('1', 'true', 'yes', 'on')
+
+MAP_WIDTH = 100
+MAP_HEIGHT = 100
+CANVAS_SIZE = 500
 
 class AtacanteCLI:
     def __init__(self, root):
+        """Configura ventana, estado local y socket TCP del cliente atacante.
+        Luego crea la UI y arranca la conexion inicial con AUTH."""
         self.root = root
         self.root.title("CyberDef - Cliente Atacante")
         self.root.geometry("700x760")
         self.root.resizable(False, False)
         
-        # Posición inicial del atacante
-        self.x = 50
-        self.y = 50
+        # Coordenadas lógicas del servidor (0..99)
+        self.x = 0
+        self.y = 0
         self.step = 10
         self.player_size = 15
         self.resource_size = 8
         self.resources = {}
         self.resource_canvas_items = {}
+        self.selected_resource_id = 0
 
         # Socket setup
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -33,22 +56,28 @@ class AtacanteCLI:
         self.conectar_servidor()
 
     def setup_ui(self):
+        """Crea canvas, botones de acciones y panel de logs.
+        Tambien enlaza teclado y evento de cierre de ventana."""
         self.status_var = tk.StringVar(value="Desconectado")
         self.status_label = tk.Label(self.root, textvariable=self.status_var, font=("Arial", 12, "bold"), fg="red")
         self.status_label.pack(pady=10)
 
-        self.canvas = tk.Canvas(self.root, width=500, height=500, bg="#1e1e1e", highlightbackground="red", highlightthickness=2)
+        self.canvas = tk.Canvas(self.root, width=CANVAS_SIZE, height=CANVAS_SIZE, bg="#1e1e1e", highlightbackground="red", highlightthickness=2)
         self.canvas.pack()
 
+        self.canvas.create_rectangle(0, 0, CANVAS_SIZE - 1, CANVAS_SIZE - 1, outline="#7f1d1d")
+
+        px, py = self._world_to_canvas(self.x, self.y)
+
         self.player_id = self.canvas.create_oval(
-            self.x - self.player_size, self.y - self.player_size, 
-            self.x + self.player_size, self.y + self.player_size, 
+            px - self.player_size, py - self.player_size,
+            px + self.player_size, py + self.player_size,
             fill="red", outline="white"
         )
 
         tk.Label(
             self.root,
-            text="Controles: W,A,S,D (Mover), V (SCAN), X (ATTACK 0)",
+            text="Controles: W,A,S,D (Mover), V (SCAN), X (ATTACK 0), T (START)",
             font=("Arial", 10)
         ).pack(pady=8)
 
@@ -61,6 +90,7 @@ class AtacanteCLI:
         tk.Button(controls, text="D", width=6, command=lambda: self.move_player(self.step, 0)).grid(row=1, column=2, padx=4, pady=2)
         tk.Button(controls, text="SCAN", width=10, command=self.action_scan).grid(row=0, column=3, padx=10, pady=2)
         tk.Button(controls, text="ATTACK 0", width=10, command=self.action_attack).grid(row=1, column=3, padx=10, pady=2)
+        tk.Button(controls, text="START", width=10, command=self.action_start).grid(row=0, column=4, padx=10, pady=2)
 
         tk.Label(self.root, text="Log de eventos:", font=("Arial", 9, "bold")).pack(pady=(8, 2))
         self.log_box = scrolledtext.ScrolledText(self.root, width=80, height=8, state="disabled", font=("Consolas", 9))
@@ -70,19 +100,21 @@ class AtacanteCLI:
         self.root.protocol("WM_DELETE_WINDOW", self.cerrar_conexion)
 
     def conectar_servidor(self):
+        """Resuelve HOST por DNS, conecta al servidor CGSP y actualiza estado visual.
+        Si conecta, inicia hilo receptor y envia comando AUTH con credenciales."""
         try:
             ip_servidor = socket.gethostbyname(HOST)
             self.client_socket.connect((ip_servidor, PORT))
             self.connected = True
 
-            self.status_var.set(f"CGSP Socket IP: {ip_servidor}:{PORT}")
+            self.status_var.set(f"CGSP Socket IP: {ip_servidor}:{PORT} | usuario={CGSP_USER} sala={CGSP_ROOM}")
             self.status_label.config(fg="green")
 
             t1 = threading.Thread(target=self.recibir_eventos, daemon=True)
             t1.start()
 
             self.log("Conectado al servidor. Iniciando AUTH...")
-            self.enviar_comando("AUTH atacante1 hack2026")
+            self.enviar_comando(f"AUTH {CGSP_USER} {CGSP_PASS}")
         except socket.gaierror:
             self.status_var.set(f"Fallo resolución DNS de {HOST}")
             self.log(f"No se pudo resolver DNS para {HOST}")
@@ -94,6 +126,8 @@ class AtacanteCLI:
             self.log(f"Error de conexion: {e}")
 
     def handle_keypress(self, event):
+        """Traduce teclas W/A/S/D/V/X/T a movimiento o acciones de juego.
+        Ignora entrada de teclado cuando no hay conexion activa."""
         if not self.connected:
             return
         char = event.char.lower()
@@ -109,14 +143,18 @@ class AtacanteCLI:
             self.action_scan()
         elif char == 'x':
             self.action_attack()
+        elif char == 't':
+            self.action_start()
 
     def move_player(self, dx, dy):
+        """Calcula nueva posicion dentro de limites 0..99 y redibuja el jugador.
+        Luego notifica al servidor con el comando MOVE <dx> <dy>."""
         if not self.connected:
             return
 
-        new_x = self.x + dx
-        new_y = self.y + dy
-        if not (0 <= new_x <= 500 and 0 <= new_y <= 500):
+        new_x = max(0, min(MAP_WIDTH - 1, self.x + dx))
+        new_y = max(0, min(MAP_HEIGHT - 1, self.y + dy))
+        if new_x == self.x and new_y == self.y:
             return
 
         self.x = new_x
@@ -125,39 +163,64 @@ class AtacanteCLI:
         self.enviar_comando(f"MOVE {dx} {dy}")
 
     def action_scan(self):
+        """Envia SCAN para pedir recursos cercanos en la posicion actual."""
         if self.connected:
             self.enviar_comando("SCAN")
 
     def action_attack(self):
+        """Envia ATTACK sobre el recurso seleccionado en selected_resource_id."""
         if self.connected:
-            self.enviar_comando("ATTACK 0")
+            self.enviar_comando(f"ATTACK {self.selected_resource_id}")
+
+    def action_start(self):
+        """Lanza inicio manual de partida enviando START y registrando el intento."""
+        if self.connected:
+            self.log("[MANUAL] Enviando START...")
+            self.enviar_comando("START")
+
+    def _world_to_canvas(self, x, y):
+        """Convierte coordenadas logicas del mapa (0..99) a pixeles del canvas.
+        Usa escala lineal segun el tamano visual definido por CANVAS_SIZE."""
+        scale_x = (CANVAS_SIZE - 1) / (MAP_WIDTH - 1)
+        scale_y = (CANVAS_SIZE - 1) / (MAP_HEIGHT - 1)
+        return int(round(x * scale_x)), int(round(y * scale_y))
 
     def actualizar_render(self):
+        """Reposiciona el ovalo del jugador en canvas con la coordenada actual x,y."""
+        px, py = self._world_to_canvas(self.x, self.y)
         self.canvas.coords(
             self.player_id,
-            self.x - self.player_size, self.y - self.player_size,
-            self.x + self.player_size, self.y + self.player_size
+            px - self.player_size, py - self.player_size,
+            px + self.player_size, py + self.player_size
         )
 
     def _parse_int(self, value, default=None):
+        """Convierte un valor a entero de forma segura.
+        Si falla por formato o tipo, retorna el valor default."""
         try:
             return int(value)
         except (TypeError, ValueError):
             return default
 
     def _fallback_resource_xy(self, resource_id):
-        # Si el evento no trae coordenadas, distribuimos puntos de forma estable para visualizar el recurso.
-        base = abs(hash(resource_id))
-        x = 40 + (base % 420)
-        y = 40 + ((base // 101) % 420)
+        """Genera coordenadas pseudo-deterministicas para un recurso sin x,y.
+        Esto evita que un recurso quede sin representacion visual en el mapa."""
+        try:
+            rid = int(resource_id)
+        except (TypeError, ValueError):
+            rid = sum(ord(c) for c in str(resource_id))
+        x = 5 + (rid * 37 + 11) % (MAP_WIDTH  - 10)
+        y = 5 + (rid * 53 + 17) % (MAP_HEIGHT - 10)
         return x, y
 
     def _upsert_resource(self, resource_id, x=None, y=None, attacked=None):
+        """Inserta o actualiza recurso en memoria local (coords y estado attacked).
+        Si no hay coordenadas, aplica fallback y luego redibuja el recurso."""
         resource = self.resources.get(resource_id, {})
 
         if x is not None and y is not None:
-            resource['x'] = x
-            resource['y'] = y
+            resource['x'] = max(0, min(MAP_WIDTH - 1, x))
+            resource['y'] = max(0, min(MAP_HEIGHT - 1, y))
         elif 'x' not in resource or 'y' not in resource:
             fx, fy = self._fallback_resource_xy(resource_id)
             resource['x'] = fx
@@ -172,12 +235,13 @@ class AtacanteCLI:
         self._draw_resource(resource_id)
 
     def _draw_resource(self, resource_id):
+        """Crea o actualiza el rectangulo/etiqueta del recurso en el canvas.
+        Cambia color y borde segun si el recurso esta atacado o no."""
         resource = self.resources.get(resource_id)
         if not resource:
             return
 
-        x = resource['x']
-        y = resource['y']
+        x, y = self._world_to_canvas(resource['x'], resource['y'])
         attacked = resource.get('attacked', False)
         fill = '#ef4444' if attacked else '#facc15'
         outline = '#7f1d1d' if attacked else '#a16207'
@@ -214,6 +278,8 @@ class AtacanteCLI:
             self.canvas.itemconfig(label_id, text=f"R{resource_id}")
 
     def enviar_comando(self, command):
+        """Normaliza salto de linea, envia comando CGSP por socket y lo loggea.
+        Si ocurre error de envio, lo reporta en el panel de eventos."""
         if not command.endswith("\n"):
             command += "\n"
 
@@ -224,6 +290,8 @@ class AtacanteCLI:
             self.log(f"Error enviando datos: {e}")
 
     def recibir_eventos(self):
+        """Recibe stream del socket, acumula buffer y separa mensajes por linea.
+        Cada comando completo se delega a procesar_comando_cgsp."""
         while self.connected:
             try:
                 data = self.client_socket.recv(1024)
@@ -246,6 +314,8 @@ class AtacanteCLI:
         self.root.after(0, lambda: self.status_label.config(fg="red"))
 
     def procesar_comando_cgsp(self, comando: str):
+        """Parsea respuestas CGSP (OK/ROLE/EVENT/ERR) y sincroniza estado/UI.
+        Gestiona posicion, recursos, estado de partida y mensajes de error."""
         self.log(f"S->C: {comando}")
         partes = comando.split()
         if not partes:
@@ -257,11 +327,23 @@ class AtacanteCLI:
             if "Bienvenido" in comando:
                 self.estado = "AUTENTICADO"
                 self.log("Autenticado correctamente")
+            elif len(partes) >= 4 and partes[1].startswith('Posicion'):
+                px = self._parse_int(partes[2], self.x)
+                py = self._parse_int(partes[3], self.y)
+                self.x = max(0, min(MAP_WIDTH - 1, px))
+                self.y = max(0, min(MAP_HEIGHT - 1, py))
+                self.root.after(0, self.actualizar_render)
         elif c == 'ROLE':
             self.estado = "AUTENTICADO"
             role = partes[1] if len(partes) > 1 else "DESCONOCIDO"
             self.log(f"Rol asignado: {role}")
-            threading.Timer(0.5, lambda: self.enviar_comando("JOIN 3")).start()
+            # JOIN a la sala tras recibir ROLE
+            threading.Timer(0.5, lambda: self.enviar_comando(f"JOIN {CGSP_ROOM}")).start()
+            if CGSP_AUTO_START:
+                # Opcional: mantener el comportamiento antiguo de auto-start.
+                threading.Timer(5.0, self._intentar_start).start()
+            else:
+                self.log("Inicio manual habilitado: presiona T o el botón START para comenzar la partida.")
         elif c in ('ROOM_CREATED', 'ROOM_LIST', 'ROOM'):
             return
         elif c == 'EVENT':
@@ -275,8 +357,10 @@ class AtacanteCLI:
                 resource_id = partes[2] if len(partes) > 2 else "?"
                 x = self._parse_int(partes[3] if len(partes) > 3 else None)
                 y = self._parse_int(partes[4] if len(partes) > 4 else None)
+                parsed_id = self._parse_int(resource_id, self.selected_resource_id)
+                self.selected_resource_id = parsed_id
                 self.root.after(0, lambda rid=resource_id, rx=x, ry=y: self._upsert_resource(rid, rx, ry, attacked=False))
-                self.log(f"Recurso encontrado: {resource_id}")
+                self.log(f"Recurso encontrado: {resource_id} ({x},{y})")
             elif event_type == 'ATTACK':
                 resource_id = partes[2] if len(partes) > 2 else "?"
                 self.root.after(0, lambda rid=resource_id: self._upsert_resource(rid, attacked=True))
@@ -287,6 +371,13 @@ class AtacanteCLI:
                     self.root.after(0, lambda rid=resource_id: self._upsert_resource(rid, attacked=False))
                 actor = partes[3] if len(partes) > 3 else "defensor"
                 self.log(f"Defensa aplicada por {actor}")
+            elif event_type == 'ATTACK_TIMEOUT':
+                resource_id = partes[2] if len(partes) > 2 else '?'
+                # Marcar el recurso visualmente como comprometido
+                self.root.after(0, lambda rid=resource_id: self._upsert_resource(rid, attacked=True))
+                self.log(f'[!] RECURSO {resource_id} COMPROMETIDO por timeout de ataque (30s)')
+                self.root.after(0, lambda: self.status_var.set('ATAQUE SIN DEFENDER - DERROTA INMINENTE'))
+                self.root.after(0, lambda: self.status_label.config(fg='orange'))
             elif event_type == 'GAME_OVER':
                 self.root.after(0, lambda: self.status_var.set("PARTIDA FINALIZADA"))
         elif c == 'ERR':
@@ -298,22 +389,36 @@ class AtacanteCLI:
                 self.root.after(0, lambda: self.status_var.set("No autorizado (ERR 401)"))
             elif code == '403':
                 self.root.after(0, lambda: self.status_var.set("Accion prohibida (ERR 403)"))
+            elif code == '408':
+                # Timeout de inactividad: el servidor cerró la conexión (RFC_v2)
+                self.connected = False
+                self.root.after(0, lambda: self.status_var.set("Sesion cerrada por inactividad (ERR 408)"))
+                self.root.after(0, lambda: self.status_label.config(fg="orange"))
             elif code == '409':
                 self.root.after(0, lambda: self.status_var.set("Conflicto de estado (ERR 409)"))
             elif code == '503':
                 self.root.after(0, lambda: self.status_var.set("Servidor no disponible (ERR 503)"))
 
     def log(self, message):
+        """Escribe mensaje en consola y programa su insercion en la UI (thread-safe)."""
         print(message)
         self.root.after(0, lambda: self._append_log(message))
 
+    def _intentar_start(self):
+        """Envio automatico de START usado por el temporizador de auto-inicio."""
+        if self.connected:
+            self.log("[AUTO] Enviando START para iniciar partida...")
+            self.enviar_comando("START")
+
     def _append_log(self, message):
+        """Inserta una linea en el widget de log, hace autoscroll y bloquea edicion."""
         self.log_box.configure(state="normal")
         self.log_box.insert(tk.END, message + "\n")
         self.log_box.see(tk.END)
         self.log_box.configure(state="disabled")
 
     def cerrar_conexion(self):
+        """Intenta notificar QUIT, cierra el socket cliente y destruye la ventana."""
         if self.connected:
             try:
                 self.enviar_comando("QUIT")
