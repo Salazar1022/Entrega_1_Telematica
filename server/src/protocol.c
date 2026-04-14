@@ -307,6 +307,12 @@ static int handle_start(Player *player) {
 
 /* ── Manejador: MOVE ─────────────────────────────────────────────────────── */
 static int handle_move(Player *player, ParsedMessage *msg) {
+    if (!player->in_room || !room_is_running(player->room_id)) {
+        send_err(player->socket_fd, 409, "La partida aun no ha iniciado",
+                 player->client_ip, player->client_port);
+        return 0;
+    }
+
     if (msg->param_count < 2) {
         send_err(player->socket_fd, 400, "Uso: MOVE <dx> <dy>",
                  player->client_ip, player->client_port);
@@ -333,6 +339,12 @@ static int handle_move(Player *player, ParsedMessage *msg) {
 
 /* ── Manejador: SCAN ─────────────────────────────────────────────────────── */
 static int handle_scan(Player *player) {
+    if (!player->in_room || !room_is_running(player->room_id)) {
+        send_err(player->socket_fd, 409, "La partida aun no ha iniciado",
+                 player->client_ip, player->client_port);
+        return 0;
+    }
+
     if (player->role != ROLE_ATTACKER) {
         send_err(player->socket_fd, 403, "Solo los atacantes pueden usar SCAN",
                  player->client_ip, player->client_port);
@@ -366,6 +378,12 @@ static int handle_scan(Player *player) {
 
 /* ── Manejador: ATTACK ───────────────────────────────────────────────────── */
 static int handle_attack(Player *player, ParsedMessage *msg) {
+    if (!player->in_room || !room_is_running(player->room_id)) {
+        send_err(player->socket_fd, 409, "La partida aun no ha iniciado",
+                 player->client_ip, player->client_port);
+        return 0;
+    }
+
     if (player->role != ROLE_ATTACKER) {
         send_err(player->socket_fd, 403, "Solo los atacantes pueden usar ATTACK",
                  player->client_ip, player->client_port);
@@ -394,6 +412,12 @@ static int handle_attack(Player *player, ParsedMessage *msg) {
 
 /* ── Manejador: DEFEND ───────────────────────────────────────────────────── */
 static int handle_defend(Player *player, ParsedMessage *msg) {
+    if (!player->in_room || !room_is_running(player->room_id)) {
+        send_err(player->socket_fd, 409, "La partida aun no ha iniciado",
+                 player->client_ip, player->client_port);
+        return 0;
+    }
+
     if (player->role != ROLE_DEFENDER) {
         send_err(player->socket_fd, 403, "Solo los defensores pueden usar DEFEND",
                  player->client_ip, player->client_port);

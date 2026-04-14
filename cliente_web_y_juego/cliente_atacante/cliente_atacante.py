@@ -151,6 +151,9 @@ class AtacanteCLI:
         Luego notifica al servidor con el comando MOVE <dx> <dy>."""
         if not self.connected:
             return
+        if self.estado != "EN_PARTIDA":
+            self.log("Aun no inicia la partida: no puedes moverte.")
+            return
 
         new_x = max(0, min(MAP_WIDTH - 1, self.x + dx))
         new_y = max(0, min(MAP_HEIGHT - 1, self.y + dy))
@@ -164,13 +167,21 @@ class AtacanteCLI:
 
     def action_scan(self):
         """Envia SCAN para pedir recursos cercanos en la posicion actual."""
-        if self.connected:
-            self.enviar_comando("SCAN")
+        if not self.connected:
+            return
+        if self.estado != "EN_PARTIDA":
+            self.log("Aun no inicia la partida: SCAN bloqueado.")
+            return
+        self.enviar_comando("SCAN")
 
     def action_attack(self):
         """Envia ATTACK sobre el recurso seleccionado en selected_resource_id."""
-        if self.connected:
-            self.enviar_comando(f"ATTACK {self.selected_resource_id}")
+        if not self.connected:
+            return
+        if self.estado != "EN_PARTIDA":
+            self.log("Aun no inicia la partida: ATTACK bloqueado.")
+            return
+        self.enviar_comando(f"ATTACK {self.selected_resource_id}")
 
     def action_start(self):
         """Lanza inicio manual de partida enviando START y registrando el intento."""

@@ -155,6 +155,12 @@ int room_list(char *out, int out_size);
  */
 int room_try_start(int room_id);
 
+/*
+ * room_is_running()
+ * Retorna 1 si la sala existe y está en ROOM_RUNNING, 0 en caso contrario.
+ */
+int room_is_running(int room_id);
+
 /* ═══════════════════════════════════════════════════════
  * FUNCIONES DE ACCIÓN EN PARTIDA
  * ═══════════════════════════════════════════════════════ */

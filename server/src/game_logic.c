@@ -318,6 +318,21 @@ int room_try_start(int room_id) {
     return 1;
 }
 
+int room_is_running(int room_id) {
+    int is_running = 0;
+    pthread_mutex_lock(&rooms_mutex);
+
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        if (rooms[i].id == room_id) {
+            is_running = (rooms[i].state == ROOM_RUNNING) ? 1 : 0;
+            break;
+        }
+    }
+
+    pthread_mutex_unlock(&rooms_mutex);
+    return is_running;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
  * ACCIONES EN PARTIDA
  * ══════════════════════════════════════════════════════════════════════════ */

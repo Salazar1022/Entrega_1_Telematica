@@ -237,6 +237,24 @@ def _get_session(req, fields=None):
         return SESSIONS.get(token)
 
 
+def _resolve_desktop_host(req):
+    """Determina el host que debe usarse en CGSP_HOST para clientes desktop.
+    Prioriza DNS/dominio visible por el navegador (Host/X-Forwarded-Host)."""
+    host_header = req["headers"].get("x-forwarded-host", "").strip()
+    if not host_header:
+        host_header = req["headers"].get("host", "").strip()
+
+    if host_header:
+        # Quitar puerto si viene como "dominio:puerto".
+        if host_header.startswith("["):
+            end = host_header.find("]")
+            if end != -1:
+                return host_header[1:end]
+        return host_header.split(":", 1)[0].strip()
+
+    return GAME_HOST
+
+
 def _parse_rooms(lines):
     """
     Parsea líneas ROOM del servidor CGSP v2.
@@ -539,6 +557,8 @@ def handle_join_room(client_socket, req):
         started = True
         start_message = "Partida iniciada"
 
+    desktop_host = _resolve_desktop_host(req)
+
     send_json(
         client_socket,
         200,
@@ -549,7 +569,7 @@ def handle_join_room(client_socket, req):
             "started": started,
             "start_message": start_message,
             "desktop_config": {
-                "host": GAME_HOST,
+                "host": desktop_host,
                 "port": GAME_PORT,
                 "username": session["username"],
                 "password": session["password"],

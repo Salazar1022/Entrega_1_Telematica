@@ -207,6 +207,48 @@
         let pollInterval = null;
         let lastRoomsSignature = '';
 
+        function fallbackCopyFromElement(el) {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                return document.execCommand('copy');
+            } finally {
+                selection.removeAllRanges();
+            }
+        }
+
+        async function copyLaunchCommand(preId, text) {
+            const pre = document.getElementById(preId);
+            if (!pre) return;
+
+            let copied = false;
+            if (navigator.clipboard && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    copied = true;
+                } catch (_) {
+                    copied = false;
+                }
+            }
+
+            if (!copied) {
+                copied = fallbackCopyFromElement(pre);
+            }
+
+            if (copied) {
+                pre.style.borderColor = '#22c55e';
+                setTimeout(() => {
+                    const current = document.getElementById(preId);
+                    if (current) current.style.borderColor = '#1e3a5f';
+                }, 1500);
+            } else {
+                pre.style.borderColor = '#ef4444';
+            }
+        }
+
         // ─── Inicializar UI de perfil ───────────────────────────────────────
         document.getElementById('nav-username').textContent = storedUser;
         document.getElementById('nav-role').textContent = roleLabel;
@@ -445,7 +487,11 @@
                     const isPython = storedRole !== 'defensor';
                     const clientFile = isPython
                         ? 'cliente_web_y_juego\\cliente_atacante\\cliente_atacante.py'
-                        : 'cd cliente_web_y_juego\\cliente_defensor && javac ClienteDefensor.java && java ClienteDefensor';
+                        : [
+                            'cd cliente_web_y_juego\\cliente_defensor',
+                            'javac ClienteDefensor.java',
+                            'java ClienteDefensor'
+                        ].join('\n');
 
                     const envVars = [
                         `$env:CGSP_HOST="${c.host}"`,
@@ -473,13 +519,7 @@
                             <p style="font-size:0.72rem; color:var(--text-muted); margin:0">Clic en el bloque para copiar</p>
                         `;
                         document.getElementById('desktop-config-pre').addEventListener('click', () => {
-                            navigator.clipboard.writeText(launchCmd).then(() => {
-                                document.getElementById('desktop-config-pre').style.borderColor = '#22c55e';
-                                setTimeout(() => {
-                                    const pre = document.getElementById('desktop-config-pre');
-                                    if (pre) pre.style.borderColor = '#1e3a5f';
-                                }, 1500);
-                            });
+                            copyLaunchCommand('desktop-config-pre', launchCmd);
                         });
                     }
                 }
