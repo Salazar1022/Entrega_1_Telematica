@@ -2,13 +2,6 @@
 
 Simulador multijugador de ciberseguridad sobre protocolo TCP propio (**CGSP v2.0**).
 
-## Cierre de Entregable
-
-- Checklist de cumplimiento final: `Documentacion/checklist_entregable_final.md`
-- Guía de despliegue en nube (AWS): `Documentacion/despliegue_nube_aws.md`
-- Especificación canónica del protocolo: `Documentacion/RFC_v2.tex`
-- Nota: archivos `RFC_CGSP.*` y `rfc.tex` se conservan como histórico de versión previa.
-
 ---
 
 ## Arquitectura del Sistema
