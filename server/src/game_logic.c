@@ -32,10 +32,6 @@
 #include <time.h>       /* time               */
 #include <pthread.h>
 
-/* ═══════════════════════════════════════════════════════
- * ESTADO GLOBAL DEL SERVIDOR
- * ═══════════════════════════════════════════════════════ */
-
 /* Array de todas las salas activas */
 static Room  rooms[MAX_ROOMS];
 
@@ -45,22 +41,20 @@ static pthread_mutex_t rooms_mutex = PTHREAD_MUTEX_INITIALIZER;
 /* Contador de salas creadas (usado para generar IDs únicos) */
 static int next_room_id = 1;
 
-/* ── Función auxiliar: distancia euclidiana ─────────────────────────────── */
+/* Función auxiliar: distancia euclidiana */
 static double distance(int x1, int y1, int x2, int y2) {
     int dx = x2 - x1;
     int dy = y2 - y1;
     return sqrt((double)(dx * dx + dy * dy));
 }
 
-/* ── Función auxiliar: enviar mensaje a un socket ───────────────────────── */
+/* Función auxiliar: enviar mensaje a un socket */
 static void send_msg(int sockfd, const char *msg) {
     if (sockfd < 0) return;
     write(sockfd, msg, strlen(msg));
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * INICIALIZACIÓN
- * ══════════════════════════════════════════════════════════════════════════ */
+/* Inicializacion */
 
 void game_init(void) {
     /*
@@ -81,9 +75,7 @@ void game_init(void) {
     log_event(LOG_INFO, NULL, 0, "Sistema de juego inicializado");
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * GESTIÓN DE SALAS
- * ══════════════════════════════════════════════════════════════════════════ */
+/* Creacion de salas */
 
 int room_create(void) {
     pthread_mutex_lock(&rooms_mutex);
@@ -104,9 +96,9 @@ int room_create(void) {
     }
 
     /* Inicializar la sala */
-    Room *room         = &rooms[slot];
-    room->id           = next_room_id++;
-    room->state        = ROOM_WAITING;
+    Room *room = &rooms[slot];
+    room->id = next_room_id++;
+    room->state = ROOM_WAITING;
     room->player_count = 0;
     room->attacker_count = 0;
     room->defender_count = 0;
@@ -140,7 +132,7 @@ int room_create(void) {
     return new_id;
 }
 
-/* ── room_list() ─────────────────────────────────────────────────────────── */
+/* Listado de salas */
 
 int room_list(char *out, int out_size) {
     pthread_mutex_lock(&rooms_mutex);
@@ -179,7 +171,7 @@ int room_list(char *out, int out_size) {
     return count;
 }
 
-/* ── room_join() ─────────────────────────────────────────────────────────── */
+/* Ingreso a salas */
 
 int room_join(int room_id, Player *player) {
     pthread_mutex_lock(&rooms_mutex);
@@ -250,7 +242,7 @@ int room_join(int room_id, Player *player) {
     return 0;
 }
 
-/* ── room_try_start() ────────────────────────────────────────────────────── */
+/* Inicio de partidas */
 
 int room_try_start(int room_id) {
     pthread_mutex_lock(&rooms_mutex);
@@ -333,9 +325,7 @@ int room_is_running(int room_id) {
     return is_running;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * ACCIONES EN PARTIDA
- * ══════════════════════════════════════════════════════════════════════════ */
+/* Acciones en partida */
 
 int player_move(Player *player, int dx, int dy) {
     if (!player->in_room) return -1;
@@ -360,7 +350,7 @@ int player_move(Player *player, int dx, int dy) {
     return 0;
 }
 
-/* ── player_scan() ───────────────────────────────────────────────────────── */
+/* Escaneo de recursos */
 
 int player_scan(Player *player, char *found_msg, int msg_size) {
     if (!player->in_room) return 0;
@@ -397,7 +387,7 @@ int player_scan(Player *player, char *found_msg, int msg_size) {
     return found_count;
 }
 
-/* ── resource_attack() ───────────────────────────────────────────────────── */
+/* Ataque a recursos */
 
 int resource_attack(Player *attacker, int resource_id) {
     if (!attacker->in_room) return -1;
@@ -455,7 +445,7 @@ int resource_attack(Player *attacker, int resource_id) {
     return 0;
 }
 
-/* ── resource_defend() ───────────────────────────────────────────────────── */
+/* Defensa de recursos */
 
 int resource_defend(Player *defender, int resource_id) {
     if (!defender->in_room) return -1;
@@ -512,7 +502,7 @@ int resource_defend(Player *defender, int resource_id) {
     return 0;
 }
 
-/* ──  room_broadcast() ───────────────────────────────────────────────────── */
+/* Difusión de mensajes */
 
 void room_broadcast(int room_id, const char *message, Player *exclude) {
     pthread_mutex_lock(&rooms_mutex);
@@ -535,12 +525,7 @@ void room_broadcast(int room_id, const char *message, Player *exclude) {
     pthread_mutex_unlock(&rooms_mutex);
 }
 
-/* ──  room_broadcast_role() ──────────────────────────────────────────────── */
-/*
- * Igual que room_broadcast() pero solo envía a jugadores con el rol dado.
- * Uso: difundir resultado de SCAN solo a los demás atacantes de la sala,
- * de modo que todos los atacantes vean los mismos recursos descubiertos.
- */
+/* Difusión de mensajes por rol */
 void room_broadcast_role(int room_id, const char *message,
                          Player *exclude, PlayerRole role) {
     pthread_mutex_lock(&rooms_mutex);
@@ -554,9 +539,9 @@ void room_broadcast_role(int room_id, const char *message,
 
     if (room != NULL) {
         for (int i = 0; i < MAX_PLAYERS; i++) {
-            if (room->players[i] == NULL)          continue;
-            if (room->players[i] == exclude)        continue;  /* emisor excluido */
-            if (room->players[i]->role != role)     continue;  /* solo el rol pedido */
+            if (room->players[i] == NULL) continue;
+            if (room->players[i] == exclude) continue;  /* emisor excluido */
+            if (room->players[i]->role != role) continue;  /* solo el rol pedido */
             send_msg(room->players[i]->socket_fd, message);
         }
     }
@@ -564,7 +549,7 @@ void room_broadcast_role(int room_id, const char *message,
     pthread_mutex_unlock(&rooms_mutex);
 }
 
-/* ── room_remove_player() ────────────────────────────────────────────────── */
+/* Eliminacion de jugadores */
 
 void room_remove_player(Player *player) {
     if (!player->in_room) return;
@@ -602,7 +587,7 @@ void room_remove_player(Player *player) {
     pthread_mutex_unlock(&rooms_mutex);
 }
 
-/* ──  room_check_timers() ──────────────────────────────────────────────────────── */
+/* Verificación de temporizadores */
 
 /*
  * Revisa TODOS los timers activos:
@@ -622,7 +607,7 @@ void room_check_timers(int game_timeout_secs) {
         Room *room = &rooms[i];
         if (room->id == 0 || room->state != ROOM_RUNNING) continue;
 
-        /* ── 1. Timer global de partida (GAME_TIMEOUT) ──────────────── */
+        /* Timer global de partida (GAME_TIMEOUT) */
         int max_secs = (room->game_timeout > 0) ? room->game_timeout : game_timeout_secs;
         if (room->game_start_time > 0 &&
             (now - room->game_start_time) >= max_secs) {
@@ -642,7 +627,7 @@ void room_check_timers(int game_timeout_secs) {
             continue;  /* Pasar a la siguiente sala */
         }
 
-        /* ── 2. Timer de ataque por recurso (ATTACK_TIMEOUT) ────────── */
+        /* Timer de ataque por recurso (ATTACK_TIMEOUT) */
         for (int r = 0; r < NUM_RESOURCES; r++) {
             Resource *res = &room->resources[r];
             if (!res->under_attack) continue;
@@ -657,7 +642,7 @@ void room_check_timers(int game_timeout_secs) {
             /* Marcar recurso como "comprometido" (no bajo ataque activo,
              * pero la sala termina) */
             res->under_attack = 0;
-            room->state       = ROOM_FINISHED;
+            room->state = ROOM_FINISHED;
 
             pthread_mutex_unlock(&rooms_mutex);
 

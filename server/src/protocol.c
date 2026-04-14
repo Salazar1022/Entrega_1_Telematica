@@ -6,16 +6,16 @@
  *
  * MÁQUINA DE ESTADOS DEL CLIENTE:
  *
- *   [CONECTADO] → espera AUTH
+ *   [CONECTADO] - espera AUTH
  *       │
- *       ▼ AUTH exitoso
- *   [AUTENTICADO] → puede hacer LIST_ROOMS, CREATE_ROOM, JOIN
+ *      AUTH exitoso
+ *   [AUTENTICADO] - puede hacer LIST_ROOMS, CREATE_ROOM, JOIN
  *       │
- *       ▼ JOIN exitoso
- *   [EN_SALA] → puede hacer START
+ *      JOIN exitoso
+ *   [EN_SALA] - puede hacer START
  *       │
- *       ▼ partida iniciada
- *   [EN_PARTIDA] → MOVE, SCAN (atacante), ATTACK (atacante),
+ *      partida iniciada
+ *   [EN_PARTIDA] - MOVE, SCAN (atacante), ATTACK (atacante),
  *                  DEFEND (defensor), STATUS, QUIT
  *
  * VALIDACIONES:
@@ -38,9 +38,7 @@
 #include <stdlib.h>   /* atoi */
 #include <unistd.h>   /* write */
 
-/* ══════════════════════════════════════════════════════════════════════════
- * HELPERS DE ENVÍO DE MENSAJES
- * ══════════════════════════════════════════════════════════════════════════ */
+/* HELPERS DE ENVÍO DE MENSAJES */
 
 void send_ok(int sockfd, const char *message) {
     char buf[BUFFER_SIZE];
@@ -70,9 +68,7 @@ void send_event(int sockfd, const char *event_type, const char *params) {
     write(sockfd, buf, strlen(buf));
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * PARSER DE MENSAJES
- * ══════════════════════════════════════════════════════════════════════════ */
+/* PARSER DE MENSAJES */
 
 int parse_message(char *raw, ParsedMessage *out) {
     if (raw == NULL || out == NULL) return -1;
@@ -125,11 +121,9 @@ int parse_message(char *raw, ParsedMessage *out) {
     return 0;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * HANDLERS DE CADA COMANDO
- * ══════════════════════════════════════════════════════════════════════════ */
+/* HANDLERS DE CADA COMANDO */
 
-/* ── Manejador: AUTH ─────────────────────────────────────────────────────── */
+/* Manejador: AUTH */
 static int handle_auth(Player *player, ParsedMessage *msg) {
     /* Validar que el jugador no esté ya autenticado */
     if (player->authenticated) {
@@ -207,7 +201,7 @@ static int handle_auth(Player *player, ParsedMessage *msg) {
     return 0;
 }
 
-/* ── Manejador: LIST_ROOMS ───────────────────────────────────────────────── */
+/* Manejador: LIST_ROOMS */
 static int handle_list_rooms(Player *player) {
     log_event(LOG_INFO, player->client_ip, player->client_port, "LIST_ROOMS");
 
@@ -227,7 +221,7 @@ static int handle_list_rooms(Player *player) {
     return 0;
 }
 
-/* ── Manejador: CREATE_ROOM ──────────────────────────────────────────────── */
+/* Manejador: CREATE_ROOM */
 static int handle_create_room(Player *player) {
     log_event(LOG_INFO, player->client_ip, player->client_port, "CREATE_ROOM");
 
@@ -250,7 +244,7 @@ static int handle_create_room(Player *player) {
     return 0;
 }
 
-/* ── Manejador: JOIN ─────────────────────────────────────────────────────── */
+/* Manejador: JOIN */
 static int handle_join(Player *player, ParsedMessage *msg) {
     if (msg->param_count < 1) {
         send_err(player->socket_fd, 400, "Uso: JOIN <room_id>",
@@ -284,7 +278,7 @@ static int handle_join(Player *player, ParsedMessage *msg) {
     return 0;
 }
 
-/* ── Manejador: START ────────────────────────────────────────────────────── */
+/* Manejador: START */
 static int handle_start(Player *player) {
     if (!player->in_room) {
         send_err(player->socket_fd, 403, "No estas en ninguna sala",
@@ -305,7 +299,7 @@ static int handle_start(Player *player) {
     return 0;
 }
 
-/* ── Manejador: MOVE ─────────────────────────────────────────────────────── */
+/* Manejador: MOVE */
 static int handle_move(Player *player, ParsedMessage *msg) {
     if (!player->in_room || !room_is_running(player->room_id)) {
         send_err(player->socket_fd, 409, "La partida aun no ha iniciado",
@@ -337,7 +331,7 @@ static int handle_move(Player *player, ParsedMessage *msg) {
     return 0;
 }
 
-/* ── Manejador: SCAN ─────────────────────────────────────────────────────── */
+/* Manejador: SCAN */
 static int handle_scan(Player *player) {
     if (!player->in_room || !room_is_running(player->room_id)) {
         send_err(player->socket_fd, 409, "La partida aun no ha iniciado",
@@ -376,7 +370,7 @@ static int handle_scan(Player *player) {
     return 0;
 }
 
-/* ── Manejador: ATTACK ───────────────────────────────────────────────────── */
+/* Manejador: ATTACK */
 static int handle_attack(Player *player, ParsedMessage *msg) {
     if (!player->in_room || !room_is_running(player->room_id)) {
         send_err(player->socket_fd, 409, "La partida aun no ha iniciado",
@@ -410,7 +404,7 @@ static int handle_attack(Player *player, ParsedMessage *msg) {
     return 0;
 }
 
-/* ── Manejador: DEFEND ───────────────────────────────────────────────────── */
+/* Manejador: DEFEND */
 static int handle_defend(Player *player, ParsedMessage *msg) {
     if (!player->in_room || !room_is_running(player->room_id)) {
         send_err(player->socket_fd, 409, "La partida aun no ha iniciado",
@@ -444,7 +438,7 @@ static int handle_defend(Player *player, ParsedMessage *msg) {
     return 0;
 }
 
-/* ── Manejador: STATUS ───────────────────────────────────────────────────── */
+/* Manejador: STATUS */
 static int handle_status(Player *player) {
     char status_msg[256];
     const char *role_str = (player->role == ROLE_ATTACKER) ? "ATTACKER" : "DEFENDER";
@@ -458,9 +452,7 @@ static int handle_status(Player *player) {
     return 0;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * DISPATCHER PRINCIPAL
- * ══════════════════════════════════════════════════════════════════════════ */
+/* DISPATCHER PRINCIPAL */
 
 int handle_client_message(Player *player, ParsedMessage *msg) {
     /* Log de cada petición recibida */
@@ -477,18 +469,18 @@ int handle_client_message(Player *player, ParsedMessage *msg) {
     }
     log_event(LOG_INFO, player->client_ip, player->client_port, log_msg);
 
-    /* ── Comando QUIT: siempre permitido ──────────────────────────────── */
+    /* Comando QUIT: siempre permitido */
     if (strcmp(msg->cmd, "QUIT") == 0) {
         send_ok(player->socket_fd, "Hasta luego");
         return -1;  /* Señal para cerrar la conexión */
     }
 
-    /* ── AUTH: único comando que no requiere autenticación previa ──────── */
+    /* AUTH: único comando que no requiere autenticación previa */
     if (strcmp(msg->cmd, "AUTH") == 0) {
         return handle_auth(player, msg);
     }
 
-    /* ── Todos los demás comandos requieren estar autenticado ─────────── */
+    /* Todos los demás comandos requieren estar autenticado */
     if (!player->authenticated) {
         send_err(player->socket_fd, 401,
                  "Debes autenticarte primero con AUTH <usuario> <password>",
@@ -496,7 +488,7 @@ int handle_client_message(Player *player, ParsedMessage *msg) {
         return 0;
     }
 
-    /* ── Dispatch por comando ─────────────────────────────────────────── */
+    /* Dispatch por comando */
     if (strcmp(msg->cmd, "LIST_ROOMS")   == 0) return handle_list_rooms(player);
     if (strcmp(msg->cmd, "CREATE_ROOM")  == 0) return handle_create_room(player);
     if (strcmp(msg->cmd, "JOIN")         == 0) return handle_join(player, msg);

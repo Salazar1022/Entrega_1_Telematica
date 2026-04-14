@@ -10,7 +10,7 @@
  *   Texto plano, terminado en '\n'. Un mensaje por línea.
  *   Campos separados por espacios.
  *
- *   Cliente → Servidor:
+ *   Cliente - Servidor:
  *     AUTH <usuario> <password>
  *     LIST_ROOMS
  *     CREATE_ROOM
@@ -23,7 +23,7 @@
  *     STATUS
  *     QUIT
  *
- *   Servidor → Cliente:
+ *   Servidor - Cliente:
  *     OK <mensaje>
  *     ERR <código> <mensaje>
  *     ROLE <ATTACKER|DEFENDER>
@@ -37,13 +37,13 @@
  *     EVENT GAME_OVER <ATTACKER|DEFENDER>
  *
  * CÓDIGOS DE ERROR:
- *   400 → Formato de mensaje inválido
- *   401 → Autenticación fallida
- *   403 → Acción no permitida para tu rol o estado
- *   404 → Sala o recurso no encontrado
- *   409 → Conflicto (sala llena, partida ya iniciada, etc.)
- *   500 → Error interno del servidor
- *   503 → Servicio de identidad no disponible
+ *   400 - Formato de mensaje inválido
+ *   401 - Autenticación fallida
+ *   403 - Acción no permitida para tu rol o estado
+ *   404 - Sala o recurso no encontrado
+ *   409 - Conflicto (sala llena, partida ya iniciada, etc.)
+ *   500 - Error interno del servidor
+ *   503 - Servicio de identidad no disponible
  */
 
 #ifndef PROTOCOL_H
@@ -58,9 +58,9 @@
  * ParsedMessage — Resultado de parsear una línea del cliente
  *
  * Después de llamar a parse_message(), tenemos:
- *   cmd       → el comando principal (ej: "AUTH", "MOVE")
- *   params    → los parámetros (ej: params[0]="juan", params[1]="pass")
- *   param_count → cuántos parámetros había
+ *   cmd - el comando principal (ej: "AUTH", "MOVE")
+ *   params - los parámetros (ej: params[0]="juan", params[1]="pass")
+ *   param_count - cuántos parámetros había
  */
 typedef struct {
     char  cmd[32];                   /* Comando extraído                */
@@ -75,16 +75,16 @@ typedef struct {
  * Elimina el '\n' y '\r' del final si existen.
  *
  * Ejemplo:
- *   Input → "MOVE 5 -3\n"
- *   Output → cmd="MOVE", params={"5","-3"}, param_count=2
+ *   Input - "MOVE 5 -3\n"
+ *   Output - cmd="MOVE", params={"5","-3"}, param_count=2
  *
  * Parámetros:
- *   raw    → línea recibida del cliente (se modifica internamente)
- *   out    → estructura donde se guardan los resultados
+ *   raw - línea recibida del cliente (se modifica internamente)
+ *   out - estructura donde se guardan los resultados
  *
  * Retorna:
- *   0  → mensaje bien formado
- *  -1  → mensaje vacío o inválido
+ *   0 - mensaje bien formado
+ *  -1 - mensaje vacío o inválido
  */
 int parse_message(char *raw, ParsedMessage *out);
 
@@ -101,12 +101,12 @@ int parse_message(char *raw, ParsedMessage *out);
  *   - Que la sala exista y la partida esté en el estado correcto
  *
  * Parámetros:
- *   player → jugador que envió el mensaje
- *   msg    → mensaje ya parseado
+ *   player - jugador que envió el mensaje
+ *   msg - mensaje ya parseado
  *
  * Retorna:
- *   0  → conexión sigue activa
- *  -1  → el cliente envió QUIT o hubo un error fatal (cerrar conexión)
+ *   0 - conexión sigue activa
+ *  -1 - el cliente envió QUIT o hubo un error fatal (cerrar conexión)
  */
 int handle_client_message(Player *player, ParsedMessage *msg);
 

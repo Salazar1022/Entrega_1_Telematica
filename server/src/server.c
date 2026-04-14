@@ -62,17 +62,15 @@
 #include "../include/game_logic.h"
 #include "../include/protocol.h"
 
-/* ── Variable global para el señal handler ───────────────────────────────── */
+/* Variable global para el señal handler */
 static volatile int server_running = 1;
 static int          server_fd      = -1;
 
-/* Configuraci\u00f3n de timeouts leida de variables de entorno (RFC_v2) */
+/* Configuracion de timeouts leida de variables de entorno (RFC_v2) */
 static int idle_timeout_secs = IDLE_TIMEOUT_DEF;  /* default: 600 s */
 static int game_timeout_secs = GAME_TIMEOUT;       /* default: 600 s */
 
-/* ══════════════════════════════════════════════════════════════════════════
- * HILO DE CLIENTE — se ejecuta uno por cada conexión aceptada
- * ══════════════════════════════════════════════════════════════════════════ */
+/* HILO DE CLIENTE — se ejecuta uno por cada conexión aceptada */
 
 /*
  * ClientArgs — estructura que pasamos al hilo nuevo.
@@ -161,8 +159,8 @@ static void *client_thread(void *arg) {
 
         if (bytes_received <= 0) {
             /*
-             * bytes_received == 0 → EOF (cliente cerró la conexión)
-             * bytes_received <  0 → error o TIMEOUT de inactividad (RFC_v2)
+             * bytes_received == 0 - EOF (cliente cerró la conexión)
+             * bytes_received <  0 - error o TIMEOUT de inactividad (RFC_v2)
              */
             if (bytes_received < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -180,7 +178,7 @@ static void *client_thread(void *arg) {
                 log_event(LOG_INFO, player->client_ip, player->client_port,
                           "Cliente cerro la conexion (EOF)");
             }
-            break;  /* Salir del loop → limpiar y terminar el hilo */
+            break;  /* Salir del loop - limpiar y terminar el hilo */
         }
 
         /*
@@ -243,9 +241,7 @@ cleanup:
     return NULL;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * MANEJADOR DE SEÑAL — Ctrl+C cierra el servidor limpiamente
- * ══════════════════════════════════════════════════════════════════════════ */
+/* MANEJADOR DE SEÑAL, Ctrl+C cierra el servidor limpiamente */
 
 static void signal_handler(int sig) {
     (void)sig;  /* Suprimir warning de "parámetro no usado" */
@@ -254,9 +250,7 @@ static void signal_handler(int sig) {
     if (server_fd >= 0) close(server_fd);
 }
 
-/* ══════════════════════════════════════════════════════════════════════════════
- * HILO DE TIMERS — verifica cada segundo los timers de ataque y de partida
- * ══════════════════════════════════════════════════════════════════════════════ */
+/* HILO DE TIMERS, verifica cada segundo los timers de ataque y de partida */
 
 static void *timer_thread(void *arg) {
     (void)arg;
@@ -267,9 +261,7 @@ static void *timer_thread(void *arg) {
     return NULL;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * MAIN
- * ══════════════════════════════════════════════════════════════════════════ */
+/* Main */
 
 int main(int argc, char *argv[]) {
     /*
@@ -368,8 +360,8 @@ int main(int argc, char *argv[]) {
      *
      * Para cada cliente:
      *   1. Preparar los argumentos del hilo (ClientArgs)
-     *   2. pthread_create() → lanza un hilo nuevo con client_thread()
-     *   3. pthread_detach() → el hilo libera sus recursos automáticamente
+     *   2. pthread_create() - lanza un hilo nuevo con client_thread()
+     *   3. pthread_detach() - el hilo libera sus recursos automáticamente
      *                         al terminar (no necesitamos pthread_join())
      */
     while (server_running) {

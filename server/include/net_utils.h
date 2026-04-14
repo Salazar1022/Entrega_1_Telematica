@@ -38,13 +38,13 @@
  * Crea, configura y pone en escucha un socket TCP del servidor.
  *
  * Internamente hace:
- *   1. socket()  → crea el socket
- *   2. setsockopt(SO_REUSEADDR) → permite reusar el puerto tras reinicios
- *   3. bind()    → asocia el socket al puerto indicado en INADDR_ANY
- *   4. listen()  → pone el socket en modo pasivo
+ *   1. socket() - crea el socket
+ *   2. setsockopt(SO_REUSEADDR) - permite reusar el puerto tras reinicios
+ *   3. bind() - asocia el socket al puerto indicado en INADDR_ANY
+ *   4. listen() - pone el socket en modo pasivo
  *
  * Parámetros:
- *   port → número de puerto en el que escucha el servidor (ej: 8080)
+ *   port - número de puerto en el que escucha el servidor (ej: 8080)
  *
  * Retorna:
  *   descriptor de archivo del socket servidor (>= 0) si todo salió bien
@@ -59,8 +59,8 @@ int create_server_socket(int port);
  * Esta función es la que usamos para contactar el servicio de identidad.
  *
  * Parámetros:
- *   hostname → nombre de dominio o IP como string (ej: "identity.local")
- *   port     → puerto del servicio destino
+ *   hostname - nombre de dominio o IP como string (ej: "identity.local")
+ *   port - puerto del servicio destino
  *
  * Retorna:
  *   descriptor del socket conectado (>= 0) si todo salió bien
@@ -76,10 +76,10 @@ int resolve_and_connect(const char *hostname, int port);
  * Se usa para el logging: registramos siempre IP:puerto del cliente.
  *
  * Parámetros:
- *   addr     → estructura con la dirección del cliente (devuelta por accept)
- *   ip_buf   → buffer donde se escribe la IP como string
- *   buf_size → tamaño del buffer ip_buf
- *   port     → se escribe aquí el puerto del cliente
+ *   addr - estructura con la dirección del cliente (devuelta por accept)
+ *   ip_buf - buffer donde se escribe la IP como string
+ *   buf_size - tamaño del buffer ip_buf
+ *   port - se escribe aquí el puerto del cliente
  */
 void get_client_info(struct sockaddr_in *addr, char *ip_buf, int buf_size,
                      int *port);

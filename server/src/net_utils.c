@@ -4,27 +4,27 @@
  * Explicación de las funciones clave de la API de Berkeley:
  *
  *   socket(AF_INET, SOCK_STREAM, 0)
- *     → Crea un socket TCP/IPv4.
+ *       Crea un socket TCP/IPv4.
  *       AF_INET    = familia de direcciones IPv4
  *       SOCK_STREAM = tipo orientado a conexión (TCP)
  *       0           = el SO elige automáticamente el protocolo (TCP)
  *
  *   setsockopt(SO_REUSEADDR)
- *     → Permite reusar el puerto inmediatamente después de un reinicio.
+ *       Permite reusar el puerto inmediatamente después de un reinicio.
  *       Sin esto, si el servidor se cae y se reinicia, el SO mantiene
  *       el puerto en estado TIME_WAIT por ~60 segundos y bind() falla.
  *
  *   bind()
- *     → Asocia el socket a una dirección IP y puerto.
+ *       Asocia el socket a una dirección IP y puerto.
  *       Usamos INADDR_ANY para aceptar conexiones en cualquier interfaz.
  *
  *   listen(backlog=10)
- *     → Pone el socket en modo pasivo. backlog=10 significa que el SO
+ *       Pone el socket en modo pasivo. backlog=10 significa que el SO
  *       puede encolar hasta 10 conexiones pendientes mientras el servidor
  *       está ocupado en accept().
  *
  *   getaddrinfo()
- *     → Resuelve un hostname a una dirección IP usando DNS.
+ *       Resuelve un hostname a una dirección IP usando DNS.
  *       Es la función moderna (reemplaza a gethostbyname()).
  *       Soporta IPv4 e IPv6 transparentemente.
  */
@@ -42,7 +42,7 @@
 #include <netdb.h>           /* getaddrinfo, freeaddrinfo     */
 #include <errno.h>           /* errno, strerror               */
 
-/* ── create_server_socket() ─────────────────────────────────────────────── */
+/* Creación de socket del servidor */
 
 int create_server_socket(int port) {
     int server_fd;
@@ -77,10 +77,10 @@ int create_server_socket(int port) {
     /*
      * PASO 3: Configurar la dirección del servidor.
      * memset limpia la estructura (evita basura en la memoria).
-     *   sin_family = AF_INET  → IPv4
-     *   sin_addr   = INADDR_ANY → acepta conexiones en cualquier IP
+     *   sin_family = AF_INET - IPv4
+     *   sin_addr = INADDR_ANY - acepta conexiones en cualquier IP
      *                             que tenga este host (0.0.0.0)
-     *   sin_port   = htons(port) → htons convierte el puerto de
+     *   sin_port = htons(port) - htons convierte el puerto de
      *                              "host byte order" a "network byte order"
      *                              (las redes usan big-endian)
      */
@@ -122,7 +122,7 @@ int create_server_socket(int port) {
     return server_fd;
 }
 
-/* ── resolve_and_connect() ──────────────────────────────────────────────── */
+/* Resolución y conexión */
 
 int resolve_and_connect(const char *hostname, int port) {
     /*
@@ -189,10 +189,9 @@ int resolve_and_connect(const char *hostname, int port) {
     return sockfd;
 }
 
-/* ── get_client_info() ───────────────────────────────────────────────────── */
+/* Obtención de información del cliente */
 
-void get_client_info(struct sockaddr_in *addr, char *ip_buf, int buf_size,
-                     int *port) {
+void get_client_info(struct sockaddr_in *addr, char *ip_buf, int buf_size, int *port) {
     /*
      * inet_ntop() convierte la dirección IP binaria (32 bits) a string.
      * Es el opuesto de inet_pton().

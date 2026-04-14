@@ -25,9 +25,7 @@
 /* Tamaño del buffer de comunicación con el servicio de identidad */
 #define IDENTITY_BUFSIZE  512
 
-IdentityResult identity_authenticate(const char *username,
-                                     const char *password,
-                                     PlayerRole *role_out) {
+IdentityResult identity_authenticate(const char *username, const char *password, PlayerRole *role_out) {
     /*
      * PASO 1: Leer configuración del servicio desde variables de entorno.
      *
@@ -109,9 +107,9 @@ IdentityResult identity_authenticate(const char *username,
      * PASO 5: Parsear la respuesta del servicio de identidad.
      *
      * Respuestas esperadas:
-     *   "OK ATTACKER"  → usuario válido, es atacante
-     *   "OK DEFENDER"  → usuario válido, es defensor
-     *   "ERR 401 ..."  → credenciales inválidas
+     *   "OK ATTACKER"  - usuario válido, es atacante
+     *   "OK DEFENDER"  - usuario válido, es defensor
+     *   "ERR 401 ..."  - credenciales inválidas
      *
      * strncmp() compara los primeros N caracteres. Lo usamos para
      * verificar el prefijo sin importar el resto del mensaje.

@@ -20,7 +20,7 @@
 #include <time.h>       /* time, localtime, strftime */
 #include <pthread.h>    /* pthread_mutex_*         */
 
-/* ── Variables globales del módulo (privadas a este .c) ──────────────────── */
+/* Variables globales del módulo (privadas a este .c) */
 
 /* Puntero al archivo de logs. NULL si el logger no fue inicializado. */
 static FILE *log_file = NULL;
@@ -39,7 +39,7 @@ static const char *level_strings[] = {
     "ERROR"    /* LOG_ERROR */
 };
 
-/* ── Implementación pública ──────────────────────────────────────────────── */
+/* Implementación pública */
 
 int logger_init(const char *log_filepath) {
     /*
@@ -69,9 +69,9 @@ void log_event(LogLevel level, const char *client_ip, int client_port,
                const char *message) {
     /*
      * 1. Obtenemos la hora actual del sistema con precisión de segundos.
-     *    time()      → segundos desde epoch (1970-01-01)
-     *    localtime() → convierte a hora local (struct tm)
-     *    strftime()  → formatea la hora como string legible
+     *    time() - segundos desde epoch (1970-01-01)
+     *    localtime() - convierte a hora local (struct tm)
+     *    strftime() - formatea la hora como string legible
      */
     time_t now = time(NULL);
     struct tm *t = localtime(&now);

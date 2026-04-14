@@ -2,9 +2,9 @@
  * game_logic.h — Estructuras de Datos y Lógica del Juego
  *
  * Define todas las estructuras que representan el estado del juego:
- *   - Player   : un jugador conectado (socket, usuario, rol, posición)
- *   - Resource : un recurso crítico en el mapa (servidor/router)
- *   - Room     : una sala de juego con sus jugadores y recursos
+ *   - Player: un jugador conectado (socket, usuario, rol, posición)
+ *   - Resource: un recurso crítico en el mapa (servidor/router)
+ *   - Room: una sala de juego con sus jugadores y recursos
  *
  * EL MAPA:
  *   Es un plano 2D de MAP_WIDTH x MAP_HEIGHT unidades.
@@ -120,9 +120,9 @@ int room_create(void);
  * room_join()
  * Añade un jugador autenticado a la sala especificada.
  * Retorna 0 si tuvo éxito, o un código de error negativo:
- *  -1 → sala no existe
- *  -2 → sala llena
- *  -3 → partida ya iniciada
+ *  -1 - sala no existe
+ *  -2 - sala llena
+ *  -3 - partida ya iniciada
  */
 int room_join(int room_id, Player *player);
 

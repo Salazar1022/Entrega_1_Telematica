@@ -12,9 +12,9 @@
  *   [2026-04-09 14:32:01] [INFO] [192.168.1.5:52341] OK ROLE ATTACKER
  *
  * NIVELES:
- *   LOG_INFO  → eventos normales
- *   LOG_WARN  → situaciones sospechosas (ej: mensaje inválido)
- *   LOG_ERROR → errores graves (ej: fallo al conectar al servicio de identidad)
+ *   LOG_INFO - eventos normales
+ *   LOG_WARN - situaciones sospechosas (ej: mensaje inválido)
+ *   LOG_ERROR - errores graves (ej: fallo al conectar al servicio de identidad)
  *
  * THREAD-SAFETY:
  *   Usa un mutex interno para que múltiples hilos puedan escribir
@@ -37,7 +37,7 @@ typedef enum {
  * Inicializa el logger. Debe llamarse UNA SOLA VEZ al inicio del servidor.
  *
  * Parámetros:
- *   log_filepath → ruta del archivo donde se guardarán los logs
+ *   log_filepath - ruta del archivo donde se guardarán los logs
  *                  (ej: "server.log")
  *
  * Retorna:
@@ -52,10 +52,10 @@ int logger_init(const char *log_filepath);
  * Escribe un evento en consola y en el archivo de logs.
  *
  * Parámetros:
- *   level      → LOG_INFO, LOG_WARN o LOG_ERROR
- *   client_ip  → IP del cliente (ej: "192.168.1.5"), o NULL si es del servidor
- *   client_port→ puerto del cliente (ej: 52341), o 0 si es del servidor
- *   message    → texto del mensaje a registrar
+ *   level - LOG_INFO, LOG_WARN o LOG_ERROR
+ *   client_ip - IP del cliente (ej: "192.168.1.5"), o NULL si es del servidor
+ *   client_port - puerto del cliente (ej: 52341), o 0 si es del servidor
+ *   message - texto del mensaje a registrar
  */
 void log_event(LogLevel level, const char *client_ip, int client_port,
                const char *message);
