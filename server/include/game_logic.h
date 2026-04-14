@@ -28,25 +28,18 @@
 #include <pthread.h>  /* pthread_mutex_t */
 #include <time.h>     /* time_t          */
 
-/* ═══════════════════════════════════════════════════════
- * CONSTANTES DEL JUEGO
- * ═══════════════════════════════════════════════════════ */
 
-#define MAP_WIDTH         100      /* Ancho del plano de juego          */
-#define MAP_HEIGHT        100      /* Alto del plano de juego           */
-#define MAX_PLAYERS       10       /* Máx. jugadores por sala           */
-#define MAX_ROOMS         20       /* Máx. salas simultáneas            */
-#define NUM_RESOURCES     2        /* Recursos críticos por sala        */
-#define DETECTION_RADIUS  12       /* Radio de detección al hacer SCAN  */
-#define ATTACK_TIMEOUT    30       /* Segundos para defender un ataque  */
-#define GAME_TIMEOUT      600      /* Duración máx. de partida (seg)    */
-#define IDLE_TIMEOUT_DEF  600      /* Inactividad del cliente (seg)     */
-#define MAX_USERNAME      64       /* Largo máximo del nombre de usuario*/
-#define MAX_ROOM_ID       16       /* Largo máximo del ID de sala       */
-
-/* ═══════════════════════════════════════════════════════
- * ENUMERACIONES
- * ═══════════════════════════════════════════════════════ */
+#define MAP_WIDTH 100      /* Ancho del plano de juego          */
+#define MAP_HEIGHT 100     /* Alto del plano de juego           */
+#define MAX_PLAYERS 10     /* Máx. jugadores por sala           */
+#define MAX_ROOMS 20       /* Máx. salas simultáneas            */
+#define NUM_RESOURCES 2    /* Recursos críticos por sala        */
+#define DETECTION_RADIUS 12 /* Radio de detección al hacer SCAN  */
+#define ATTACK_TIMEOUT 30  /* Segundos para defender un ataque  */
+#define GAME_TIMEOUT 600   /* Duración máx. de partida (seg)    */
+#define IDLE_TIMEOUT_DEF 600 /* Inactividad del cliente (seg)     */
+#define MAX_USERNAME 64    /* Largo máximo del nombre de usuario*/
+#define MAX_ROOM_ID 16     /* Largo máximo del ID de sala       */
 
 /* Rol del jugador — viene del servicio de identidad */
 typedef enum {
@@ -62,19 +55,16 @@ typedef enum {
     ROOM_FINISHED    /* Partida terminada                                  */
 } RoomState;
 
-/* ═══════════════════════════════════════════════════════
- * ESTRUCTURAS
- * ═══════════════════════════════════════════════════════ */
-
 /*
  * Resource — Recurso Crítico en el mapa
  * Representa un servidor/router que puede ser atacado y defendido.
  */
+
 typedef struct {
-    int  id;              /* Identificador único del recurso (0, 1, ...) */
-    int  x;              /* Posición X en el mapa                        */
-    int  y;              /* Posición Y en el mapa                        */
-    int  under_attack;   /* 1 si está siendo atacado actualmente         */
+    int id;              /* Identificador único del recurso (0, 1, ...) */
+    int x;              /* Posición X en el mapa                        */
+    int y;              /* Posición Y en el mapa                        */
+    int under_attack;   /* 1 si está siendo atacado actualmente         */
     time_t attack_time;  /* Timestamp del inicio del ataque              */
     char attacker[MAX_USERNAME]; /* Quién está atacando                  */
 } Resource;
@@ -84,16 +74,16 @@ typedef struct {
  * La estructura vive mientras dure la conexión del cliente (en el hilo).
  */
 typedef struct {
-    int    socket_fd;             /* Descriptor del socket del cliente    */
-    char   username[MAX_USERNAME];/* Nombre de usuario autenticado        */
+    int socket_fd;             /* Descriptor del socket del cliente    */
+    char username[MAX_USERNAME];/* Nombre de usuario autenticado        */
     PlayerRole role;              /* ATTACKER o DEFENDER                  */
-    int    x;                     /* Posición actual X en el mapa         */
-    int    y;                     /* Posición actual Y en el mapa         */
-    int    authenticated;         /* 1 si ya pasó por AUTH correctamente  */
-    int    in_room;               /* 1 si ya se unió a una sala           */
-    int    room_id;               /* ID de la sala actual (-1 si ninguna) */
-    char   client_ip[48];         /* IP del cliente (para logging)        */
-    int    client_port;           /* Puerto del cliente (para logging)    */
+    int x;                     /* Posición actual X en el mapa         */
+    int y;                     /* Posición actual Y en el mapa         */
+    int authenticated;         /* 1 si ya pasó por AUTH correctamente  */
+    int in_room;               /* 1 si ya se unió a una sala           */
+    int room_id;               /* ID de la sala actual (-1 si ninguna) */
+    char client_ip[48];         /* IP del cliente (para logging)        */
+    int client_port;           /* Puerto del cliente (para logging)    */
 } Player;
 
 /*
@@ -101,21 +91,17 @@ typedef struct {
  * Contenedor de todos los jugadores y recursos de una partida.
  */
 typedef struct {
-    int          id;                        /* ID numérico de la sala      */
-    RoomState    state;                     /* Estado actual               */
-    Player      *players[MAX_PLAYERS];      /* Punteros a jugadores        */
-    int          player_count;              /* Cuántos jugadores hay       */
-    int          attacker_count;            /* Cuántos son atacantes       */
-    int          defender_count;            /* Cuántos son defensores      */
-    Resource     resources[NUM_RESOURCES];  /* Recursos del mapa           */
-    time_t       game_start_time;           /* Timestamp de inicio (RUNNING)*/
-    int          game_timeout;             /* Duración máx. de partida (s) */
+    int id;                        /* ID numérico de la sala      */
+    RoomState state;                     /* Estado actual               */
+    Player *players[MAX_PLAYERS];      /* Punteros a jugadores        */
+    int player_count;              /* Cuántos jugadores hay       */
+    int attacker_count;            /* Cuántos son atacantes       */
+    int defender_count;            /* Cuántos son defensores      */
+    Resource resources[NUM_RESOURCES];  /* Recursos del mapa           */
+    time_t game_start_time;           /* Timestamp de inicio (RUNNING)*/
+    int game_timeout;             /* Duración máx. de partida (s) */
     pthread_mutex_t room_mutex;             /* Mutex para acceso seguro    */
 } Room;
-
-/* ═══════════════════════════════════════════════════════
- * FUNCIONES DE GESTIÓN DE SALAS
- * ═══════════════════════════════════════════════════════ */
 
 /*
  * game_init()
@@ -160,10 +146,6 @@ int room_try_start(int room_id);
  * Retorna 1 si la sala existe y está en ROOM_RUNNING, 0 en caso contrario.
  */
 int room_is_running(int room_id);
-
-/* ═══════════════════════════════════════════════════════
- * FUNCIONES DE ACCIÓN EN PARTIDA
- * ═══════════════════════════════════════════════════════ */
 
 /*
  * player_move()
