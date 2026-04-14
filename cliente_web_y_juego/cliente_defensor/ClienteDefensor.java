@@ -211,6 +211,10 @@ public class ClienteDefensor extends JFrame {
     private void moverJugador(int dx, int dy) {
         if (!connected)
             return;
+        if (!"EN_PARTIDA".equals(estado)) {
+            logModel.add(0, "Aun no inicia la partida: no puedes moverte.");
+            return;
+        }
 
         int newX = Math.max(0, Math.min(MAP_WIDTH - 1, x + dx));
         int newY = Math.max(0, Math.min(MAP_HEIGHT - 1, y + dy));
@@ -242,6 +246,14 @@ public class ClienteDefensor extends JFrame {
      * si no hay alertas, elige el recurso conocido más cercano y envía DEFEND.
      */
     private void defenderRecursoObjetivo() {
+        if (!connected) {
+            return;
+        }
+        if (!"EN_PARTIDA".equals(estado)) {
+            logModel.add(0, "Aun no inicia la partida: DEFEND bloqueado.");
+            return;
+        }
+
         String selected = null;
         int bestDist2 = Integer.MAX_VALUE;
 
