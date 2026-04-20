@@ -144,7 +144,7 @@
     {\normalsize
         \begin{tabular}{ll}
             \textbf{Fecha:}    & Abril 2026 \\[4pt]
-            \textbf{Materia:}  & Internet: Arquitectura y Protocolos --- 2026-1 \\[4pt]
+            \textbf{Materia:}  & Internet: Arquitectura y Protocolos \\[4pt]
             \textbf{Autores:}  & Andres Velez, Sebastian Salazar, Nathalia Cardoza
         \end{tabular}
     }\\[0.4cm]
@@ -245,7 +245,7 @@ CGSP opera en la \textbf{capa de aplicación} del modelo TCP/IP:
 \toprule
 Capa & Protocolo \\
 \midrule
-Aplicación  & \textbf{CGSP v2.0} (este documento) \\
+Aplicación  & \textbf{CGSP}\\
 Transporte  & TCP (SOCK\_STREAM) \\
 Red         & IPv4 \\
 Enlace      & Ethernet / Wi-Fi \\
@@ -1122,11 +1122,6 @@ Máx.\ salas simultáneas          & 20 \\
 Esta versión del protocolo transmite todos los mensajes, incluyendo credenciales de
 autenticación, en \textbf{texto plano sin cifrado}. Esto representa un riesgo real
 de interceptación de contraseñas en redes no confiables.
-
-La solución correcta para una versión de producción es envolver la capa TCP con
-\textbf{TLS 1.3} (usando, por ejemplo, OpenSSL o mbedTLS), lo que eliminaría este
-vector de ataque sin cambiar el formato de mensajes de CGSP. Esta mejora queda fuera
-del alcance del presente proyecto académico.
 \end{advertencia}
 
 % ─────────────────────────────────────────────────────────────────────────────
