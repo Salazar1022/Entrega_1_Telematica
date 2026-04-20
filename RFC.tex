@@ -67,8 +67,8 @@
 % ── Encabezado y pie de página ────────────────────────────────────────────────
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small\textcolor{cgsp-blue}{\textbf{RFC-CGSP-2}}}
-\fancyhead[C]{\small CyberGame Socket Protocol v2.0}
+\fancyhead[L]{\small\textcolor{cgsp-blue}{\textbf{RFC-CGSP}}}
+\fancyhead[C]{\small CyberGame Socket Protocol (CGSP)}
 \fancyhead[R]{\small Abril 2026}
 \fancyfoot[C]{\thepage}
 \renewcommand{\headrulewidth}{0.5pt}
@@ -136,18 +136,16 @@
     \vspace*{1cm}
 
     {\small\texttt{Especificación de Protocolo}}\\[0.3cm]
-    {\Huge\bfseries\color{cgsp-blue} RFC-CGSP-2}\\[0.5cm]
-    {\large\bfseries CyberGame Socket Protocol (CGSP)}\\[0.2cm]
-    {\large Versión 2.0}
+    {\Huge\bfseries\color{cgsp-blue} RFC-CGSP}\\[0.5cm]
+    {\large\bfseries CyberGame Socket Protocol (CGSP)}
 
     \vspace{1.5cm}
     \rule{\textwidth}{1pt}\\[0.4cm]
     {\normalsize
         \begin{tabular}{ll}
-            \textbf{Estado:}   & Propuesto \\[4pt]
             \textbf{Fecha:}    & Abril 2026 \\[4pt]
             \textbf{Materia:}  & Internet: Arquitectura y Protocolos --- 2026-1 \\[4pt]
-            \textbf{Autores:}  & Equipo Entrega\_1\_Telematica
+            \textbf{Autores:}  & Andres Velez, Sebastian Salazar, Nathalia Cardoza
         \end{tabular}
     }\\[0.4cm]
     \rule{\textwidth}{1pt}
@@ -195,33 +193,47 @@ persistente}. El siguiente diagrama ilustra la arquitectura del sistema:
 
 \begin{figure}[H]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
-    node distance=3.5cm,
+    node distance=2.2cm,
     box/.style={rectangle, draw=cgsp-blue, fill=cgsp-gray, rounded corners=4pt,
-                minimum width=3cm, minimum height=1cm, align=center, font=\small},
+                minimum width=2.6cm, minimum height=1cm, align=center, font=\small},
     arrow/.style={-{Stealth[length=6pt]}, thick, color=cgsp-blue}
 ]
-    \node[box] (cliente) {Cliente\\(Jugador)};
-    \node[box, right=of cliente] (servidor) {Servidor\\Central (C)};
-    \node[box, right=of servidor] (identity) {Servicio de\\Identidad};
+    \node[box] (webclient) {Navegador\\Web};
+    \node[box, right=of webclient] (httpserver) {Servidor HTTP\\Python (8080)};
+    \node[box, right=of httpserver] (servidor) {Servidor\\Central C (8081)};
+    \node[box, right=of servidor] (identity) {Servicio de\\Identidad (9090)};
+    \node[box, below=1.8cm of servidor] (clientes) {Clientes Desktop\\(Python/Java)};
 
-    \draw[arrow] ([yshift=3pt]cliente.east) -- ([yshift=3pt]servidor.west)
-        node[midway, above, font=\tiny] {TCP persistente};
-    \draw[arrow] ([yshift=-3pt]servidor.west) -- ([yshift=-3pt]cliente.east)
-        node[midway, below, font=\tiny] {CGSP texto/\textbackslash{}n};
+    \draw[arrow] ([yshift=3pt]webclient.east) -- ([yshift=3pt]httpserver.west)
+        node[midway, above, font=\tiny] {HTTP};
+    \draw[arrow] ([yshift=-3pt]httpserver.west) -- ([yshift=-3pt]webclient.east)
+        node[midway, below, font=\tiny] {HTTP};
+
+    \draw[arrow] ([yshift=3pt]httpserver.east) -- ([yshift=3pt]servidor.west)
+        node[midway, above, font=\tiny] {proxy CGSP};
+    \draw[arrow] ([yshift=-3pt]servidor.west) -- ([yshift=-3pt]httpserver.east)
+        node[midway, below, font=\tiny] {CGSP resp};
 
     \draw[arrow] ([yshift=3pt]servidor.east) -- ([yshift=3pt]identity.west)
         node[midway, above, font=\tiny] {TCP req/resp};
     \draw[arrow] ([yshift=-3pt]identity.west) -- ([yshift=-3pt]servidor.east)
         node[midway, below, font=\tiny] {OK ROLE / ERR};
+
+    \draw[arrow] (clientes.north) -- (servidor.south)
+        node[midway, right, font=\tiny] {TCP CGSP};
 \end{tikzpicture}
+}%
 \caption{Arquitectura del sistema CGSP}
 \end{figure}
 
 El servidor acepta conexiones TCP entrantes y crea un hilo POSIX (\texttt{pthread})
 dedicado por cada cliente. La conexión se mantiene activa durante toda la sesión del
 jugador. El servidor también actúa como cliente frente al Servicio de Identidad para
-autenticar usuarios.
+autenticar usuarios. Un \textbf{Servidor HTTP Python} actúa como proxy entre el
+navegador web y el servidor CGSP; los clientes desktop (Python/Tkinter para atacantes,
+Java/Swing para defensores) se conectan directamente al servidor C.
 
 \subsection{Capa de la Arquitectura TCP/IP}
 
@@ -300,7 +312,27 @@ Las primitivas de CGSP se organizan según el estado del cliente en el servidor.
 \caption{Primitivas disponibles en estado AUTENTICADO}
 \end{table}
 
-\subsubsection{Estado: EN PARTIDA}
+\subsubsection{Estado: EN SALA (WAITING)}
+
+El jugador ha ejecutado \texttt{JOIN} exitosamente y se encuentra dentro de una sala
+en espera de que la partida inicie. En este estado el servidor aún no ha recibido un
+\texttt{START} válido (es decir, con al menos un atacante y un defensor presentes).
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Primitiva} & \textbf{Dirección} & \textbf{Descripción} \\
+\midrule
+\texttt{START}  & Cliente $\rightarrow$ Servidor & Solicitar el inicio de la partida (requiere $\geq$1 atacante y $\geq$1 defensor) \\
+\texttt{STATUS} & Cliente $\rightarrow$ Servidor & Consultar estado actual del jugador y la sala \\
+\texttt{QUIT}   & Cliente $\rightarrow$ Servidor & Abandonar la sala y cerrar la conexión \\
+\bottomrule
+\end{tabularx}
+\caption{Primitivas disponibles en estado EN SALA}
+\end{table}
+
+\subsubsection{Estado: EN PARTIDA (RUNNING)}
 
 \begin{table}[H]
 \centering
@@ -309,15 +341,14 @@ Las primitivas de CGSP se organizan según el estado del cliente en el servidor.
 \textbf{Primitiva} & \textbf{Dirección} & \textbf{Rol} & \textbf{Descripción} \\
 \midrule
 \texttt{MOVE}   & C $\rightarrow$ S & Ambos    & Mover al jugador en el plano \\
-\texttt{SCAN}   & C $\rightarrow$ S & ATTACKER & Detectar recursos críticos cercanos \\
-\texttt{ATTACK} & C $\rightarrow$ S & ATTACKER & Lanzar un ataque sobre un recurso \\
-\texttt{DEFEND} & C $\rightarrow$ S & DEFENDER & Mitigar un ataque activo \\
-\texttt{START}  & C $\rightarrow$ S & Ambos    & Intentar iniciar la partida \\
+\texttt{SCAN}   & C $\rightarrow$ S & ATTACKER & Detectar recursos críticos cercanos (radio 12) \\
+\texttt{ATTACK} & C $\rightarrow$ S & ATTACKER & Lanzar un ataque sobre un recurso (debe estar a $\leq$12 unidades) \\
+\texttt{DEFEND} & C $\rightarrow$ S & DEFENDER & Mitigar un ataque activo (debe estar a $\leq$12 unidades) \\
 \texttt{STATUS} & C $\rightarrow$ S & Ambos    & Consultar estado del jugador/sala \\
 \texttt{QUIT}   & C $\rightarrow$ S & Ambos    & Abandonar la partida \\
 \bottomrule
 \end{tabularx}
-\caption{Primitivas disponibles EN PARTIDA}
+\caption{Primitivas disponibles en estado EN PARTIDA}
 \end{table}
 
 \subsubsection{Mensajes Asíncronos del Servidor}
@@ -462,10 +493,11 @@ El servidor clampea la posición resultante dentro del mapa $[0, 99] \times [0, 
 SCAN\n
 \end{lstlisting}
 
-Solo para jugadores con rol \texttt{ATTACKER}. Detecta recursos críticos en un radio de \textbf{12 unidades} alrededor de la posición actual del atacante. La detección se calcula con distancia euclidiana:
+Solo para jugadores con rol \texttt{ATTACKER}. Detecta recursos críticos en un radio de \textbf{12 unidades} (\texttt{DETECTION\_RADIUS}) alrededor de la posición actual del atacante. La detección se calcula con distancia euclidiana:
 \[
     d = \sqrt{(x_\text{jugador} - x_\text{recurso})^2 + (y_\text{jugador} - y_\text{recurso})^2} \leq 12
 \]
+Si no se detecta ningún recurso, el servidor responde: \texttt{OK SCAN: no se encontraron recursos cercanos}.
 
 \subsubsection{ATTACK --- Atacar Recurso}
 
@@ -483,6 +515,10 @@ ATTACK <resource_id>\n
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\begin{nota}
+\textbf{Restricción de proximidad.} El atacante debe estar a una distancia $\leq$ \texttt{DETECTION\_RADIUS} (12 unidades) del recurso para poder atacarlo. Si está demasiado lejos, el servidor responde \texttt{ERR 409 Debes estar cerca del recurso para atacarlo}.
+\end{nota}
 
 \textbf{Ejemplo:} \texttt{ATTACK 0}
 
@@ -502,6 +538,10 @@ DEFEND <resource_id>\n
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\begin{nota}
+\textbf{Restricción de proximidad.} El defensor debe estar a una distancia $\leq$ \texttt{DETECTION\_RADIUS} (12 unidades) del recurso para poder defenderlo. Si está demasiado lejos, el servidor responde \texttt{ERR 409 Debes estar cerca del recurso para defenderlo}.
+\end{nota}
 
 \textbf{Ejemplo:} \texttt{DEFEND 0}
 
@@ -699,24 +739,28 @@ Identidad.
 \begin{tikzpicture}[
     node distance=2.2cm,
     state/.style={rectangle, draw=cgsp-blue, fill=cgsp-gray, rounded corners=6pt,
-                  minimum width=5cm, minimum height=1cm, align=center, font=\small\bfseries},
+                  minimum width=5.5cm, minimum height=1cm, align=center, font=\small\bfseries},
     arrow/.style={-{Stealth[length=6pt]}, thick, color=cgsp-blue!70},
     label/.style={font=\tiny, color=cgsp-blue!80, align=center}
 ]
     \node[state] (S1) {CONECTADO\\{\footnotesize AUTH, QUIT}};
     \node[state, below=of S1] (S2) {AUTENTICADO\\{\footnotesize LIST\_ROOMS, CREATE\_ROOM, JOIN, STATUS, QUIT}};
-    \node[state, below=of S2] (S3) {EN SALA\\{\footnotesize START, STATUS, QUIT}};
-    \node[state, below=of S3] (S4) {EN PARTIDA\\{\footnotesize MOVE, SCAN/ATTACK, DEFEND, STATUS, QUIT}};
+    \node[state, below=of S2] (S3) {EN SALA (WAITING)\\{\footnotesize START, STATUS, QUIT}};
+    \node[state, below=of S3] (S4) {EN PARTIDA (RUNNING)\\{\footnotesize MOVE, SCAN/ATTACK, DEFEND, STATUS, QUIT}};
 
     \draw[arrow] (S1) -- (S2)
         node[midway, right, label] {AUTH exitoso\\$\rightarrow$ OK + ROLE};
     \draw[arrow] (S2) -- (S3)
-        node[midway, right, label] {JOIN exitoso\\$\rightarrow$ OK};
+        node[midway, right, label] {JOIN exitoso\\$\rightarrow$ OK + EVENT PLAYER\_JOINED (broadcast)};
     \draw[arrow] (S3) -- (S4)
-        node[midway, right, label] {START ($\geq$1 ATC + $\geq$1 DEF)\\$\rightarrow$ GAME\_STARTED + RESOURCE\_INFO};
+        node[midway, right, label] {START ($\geq$1 ATC + $\geq$1 DEF)\\$\rightarrow$ EVENT GAME\_STARTED + EVENT RESOURCE\_INFO (defensores)};
 \end{tikzpicture}
 \caption{Máquina de estados del cliente CGSP}
 \end{figure}
+
+\begin{nota}
+\textbf{Posiciones de spawn.} Al unirse a una sala, el atacante comienza en la posición $(0,\,0)$ y el defensor en $(99,\,99)$ (esquinas opuestas del mapa $100\times100$). Esto garantiza que el atacante deba explorar el mapa para encontrar recursos.
+\end{nota}
 
 \subsection{Ciclo de Vida de una Sala}
 
@@ -751,8 +795,8 @@ jugadores de la sala:
 \toprule
 \textbf{Ganador} & \textbf{Condición} \\
 \midrule
-\texttt{ATTACKER} & Al menos \textbf{un recurso crítico} no es defendido dentro del plazo de 30 s tras ser atacado. El evento \texttt{EVENT ATTACK\_TIMEOUT <resource\_id>} precede al \texttt{EVENT GAME\_OVER}. \\[6pt]
-\texttt{DEFENDER} & \textbf{Todos los ataques} sobre ambos recursos son repelidos exitosamente y el equipo atacante ejecuta \texttt{QUIT} o la sala supera el tiempo máximo de partida (ver sección~7). \\
+\texttt{ATTACKER} & Al menos \textbf{un recurso crítico} no es defendido dentro del plazo de 30 s tras ser atacado. El servidor emite \texttt{EVENT ATTACK\_TIMEOUT <resource\_id>} seguido de \texttt{EVENT GAME\_OVER ATTACKER} a todos los jugadores de la sala. \\[6pt]
+\texttt{DEFENDER} & La sala lleva en estado \texttt{RUNNING} más de \texttt{CGSP\_GAME\_TIMEOUT} segundos (por defecto 600~s) sin que ningún ataque expire. El servidor emite \texttt{EVENT GAME\_OVER DEFENDER} automáticamente. \\
 \bottomrule
 \end{tabularx}
 \caption{Condiciones de victoria de CGSP}
@@ -767,22 +811,21 @@ Si todos los atacantes abandonan, el servidor declara victoria del equipo defens
 \subsection{Flujo de Ataque y Defensa}
 
 \begin{lstlisting}
-ATACANTE          SERVIDOR             DEFENSOR(ES)
-   |                  |                     |
-   |-- ATTACK 0 ----->|                     |
-   |<- OK Ataque -----|                     |
-   |                  |-- EVENT ATTACK 0 -->|
-   |                  |     [timer: 30 s]   |
-   |                  |                     |-- DEFEND 0 -->|
-   |                  |<-------------------- DEFEND 0 ------|
-   |                  |-- EVENT DEFENDED 0 maria ---------->|
-   |<- EVENT DEFENDED |                     |
-
-  (Si el timer expira sin DEFEND:)
-   |                  |-- EVENT ATTACK_TIMEOUT 0 ---------->|
-   |<- EVENT ATTACK_T.|                     |
-   |                  |-- EVENT GAME_OVER ATTACKER -------->|
-   |<- EVENT GAME_OVER|                     |
+ATACANTE          SERVIDOR                  DEFENSOR(ES)
+   |                  |                          |
+   |-- ATTACK 0 ----->|                          |  (atacante cerca del recurso)
+   |<- OK Ataque lanzado                         |
+   |                  |-- EVENT ATTACK 0 carlos->|  (broadcast a toda la sala)
+   |                  |     [timer: 30 s]         |
+   |                  |<-- DEFEND 0 -------------|  (defensor cerca del recurso)
+   |                  |-- EVENT DEFENDED 0 maria->|  (broadcast a toda la sala)
+   |<- EVENT DEFENDED 0 maria                    |
+   |                  |                          |
+  (Escenario alternativo: el timer de 30 s expira sin que nadie defienda)
+   |                  |-- EVENT ATTACK_TIMEOUT 0->|  (broadcast)
+   |<- EVENT ATTACK_TIMEOUT 0                    |
+   |                  |-- EVENT GAME_OVER ATTACKER>|  (broadcast)
+   |<- EVENT GAME_OVER ATTACKER                  |
 \end{lstlisting}
 
 \begin{nota}
@@ -797,13 +840,14 @@ a todos los jugadores de la sala.
 \begin{lstlisting}
 ATACANTE              SERVIDOR
    |                     |
-   |-- MOVE 30 35 ------>|   pos = (30, 35)
-   |<- OK Posicion 30 35 |
-    |-- SCAN ------------>|   dist((30,35), recurso) <= 12 ?
+   |-- MOVE 30 35 ----->|   pos = (30, 35)
+   |<- OK Posicion: 30 35
+   |-- SCAN ------------>|   dist((30,35), recurso) <= 12 ?
    |<- EVENT RESOURCE_FOUND 0 32 37    (si detecta)
-   |<- OK SCAN: no encontrado          (si no detecta)
-   |-- ATTACK 0 -------->|
-   |<- OK Ataque lanzado |
+   |<- OK SCAN: no se encontraron recursos cercanos  (si no detecta)
+   |-- ATTACK 0 -------->|   dist((30,35), recurso_0) <= 12 ?
+   |<- OK Ataque lanzado |   (si esta cerca)
+   |<- ERR 409 Debes estar cerca ...   (si muy lejos)
 \end{lstlisting}
 
 \subsection{Manejo de Errores y Excepciones}
@@ -950,40 +994,90 @@ Atacante        Servidor         Defensor
 Para verificar el protocolo sin necesidad de un cliente completo:
 
 \begin{lstlisting}[language=bash]
-# Terminal 1: Iniciar el servicio de identidad stub
-python3 server/identity_stub.py 9090
+# Terminal 1: Iniciar el servicio de identidad
+cd Protocol_ServiceID
+python3 identity_server.py 9090 identity.log
 
 # Terminal 2: Iniciar el servidor de juego
 export IDENTITY_HOST=localhost
 export IDENTITY_PORT=9090
-cd server && ./server 8080 server.log
+export CGSP_IDLE_TIMEOUT=600   # opcional
+export CGSP_GAME_TIMEOUT=600   # opcional
+cd server && ./server 8081 server.log
 
-# Terminal 3: Conectar como atacante
-telnet localhost 8080
+# Terminal 3 (opcional): Servidor HTTP/Lobby
+export GAME_HOST=localhost
+export GAME_PORT=8081
+python3 cliente_web_y_juego/servidor_http/server_http.py
+# Abrir http://127.0.0.1:8080 en el navegador
 
-# Terminal 4: Conectar como defensor
-telnet localhost 8080
+# Terminal 4: Conectar directamente como atacante
+telnet localhost 8081
+
+# Terminal 5: Conectar directamente como defensor
+telnet localhost 8081
 \end{lstlisting}
 
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Parámetros del Servidor}
 % ═════════════════════════════════════════════════════════════════════════════
 
+\subsection*{Servidor Principal (C)}
 \begin{table}[H]
 \centering
-\begin{tabularx}{\textwidth}{l l l X}
+\small
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{2cm} >{\raggedright\arraybackslash}p{3.8cm}}
 \toprule
-\textbf{Parámetro} & \textbf{Fuente} & \textbf{Default} & \textbf{Descripción} \\
+\normalfont\textbf{Parámetro} & \textbf{Fuente} & \textbf{Default} & \textbf{Descripción} \\
 \midrule
-Puerto de escucha    & CLI: \texttt{./server <puerto>}   & ---         & Puerto TCP del servidor \\
-Archivo de logs      & CLI: \texttt{./server <p> <log>}  & ---         & Ruta del archivo de logging \\
-Host de identidad    & Env: \texttt{IDENTITY\_HOST}      & localhost   & Hostname del servicio de identidad \\
-Puerto de identidad  & Env: \texttt{IDENTITY\_PORT}      & 9090        & Puerto TCP del servicio de identidad \\
-Timeout de inactividad & Env: \texttt{CGSP\_IDLE\_TIMEOUT} & 600 s    & Segundos sin actividad antes de cerrar la conexión \\
-Tiempo máx.\ de partida & Env: \texttt{CGSP\_GAME\_TIMEOUT} & 600 s   & Duración máxima de una partida antes de declarar victoria defensora \\
+\normalfont Puerto de escucha  & \texttt{./server <p>}       & ---     & Puerto TCP del servidor CGSP \\
+\normalfont Archivo de logs    & \texttt{./server <p> <log>} & ---     & Archivo de logging \\
+IDENTITY\_HOST  & Variable de entorno         & localhost & Hostname del servicio de identidad \\
+IDENTITY\_PORT  & Variable de entorno         & 9090      & Puerto del servicio de identidad \\
+CGSP\_IDLE\_TIMEOUT & Variable de entorno      & 600 s     & Timeout de inactividad del cliente \\
+CGSP\_GAME\_TIMEOUT & Variable de entorno      & 600 s     & Duración máxima de partida \\
 \bottomrule
 \end{tabularx}
-\caption{Parámetros de configuración del servidor}
+\caption{Parámetros del servidor CGSP (C)}
+\end{table}
+
+\subsection*{Servicio de Identidad (\texttt{identity\_server.py})}
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{3.8cm}}
+\toprule
+\normalfont\textbf{Parámetro} & \textbf{Fuente} & \textbf{Default} & \textbf{Descripción} \\
+\midrule
+\normalfont Puerto    & \texttt{identity\_server.py <p>}      & 9090         & Puerto de escucha \\
+\normalfont Archivo de log & \texttt{identity\_server.py <p> <log>}& identity.log & Log del servicio \\
+IDENTITY\_IDLE\_TIMEOUT & Variable de entorno & 120 s       & Timeout de inactividad por cliente \\
+IDENTITY\_USERS\_FILE  & Variable de entorno & users.json   & Ruta al archivo de usuarios \\
+\bottomrule
+\end{tabularx}
+\caption{Parámetros del servicio de identidad}
+\end{table}
+
+\subsection*{Servidor HTTP / Lobby y Clientes Desktop}
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{2cm} >{\raggedright\arraybackslash}X}
+\toprule
+\normalfont\textbf{Variable} & \textbf{Default} & \textbf{Descripción} \\
+\midrule
+GAME\_HOST  & localhost   & Host del servidor CGSP (servidor HTTP) \\
+GAME\_PORT  & 8081        & Puerto del servidor CGSP (servidor HTTP) \\
+HTTP\_HOST  & 127.0.0.1   & Interfaz de escucha del servidor HTTP \\
+HTTP\_PORT  & 8080        & Puerto del servidor HTTP \\
+CGSP\_HOST  & localhost   & Host del servidor CGSP (clientes desktop) \\
+CGSP\_PORT  & 8081        & Puerto del servidor CGSP (clientes desktop) \\
+CGSP\_USER  & atacante1   & Usuario para autenticación automática \\
+CGSP\_PASS  & pass123     & Contraseña para autenticación automática \\
+CGSP\_ROOM  & 1           & Sala a la que se une el cliente al arrancar \\
+\bottomrule
+\end{tabularx}
+\caption{Variables de entorno del servidor HTTP y clientes desktop}
 \end{table}
 
 % ═════════════════════════════════════════════════════════════════════════════
@@ -1039,6 +1133,6 @@ del alcance del presente proyecto académico.
 \vspace{2cm}
 \hrule
 \vspace{0.3cm}
-{\small\centering\textit{Fin del documento RFC-CGSP-2 --- CyberGame Socket Protocol v2.0}\par}
+{\small\centering\textit{Fin del documento RFC-CGSP --- CyberGame Socket Protocol}\par}
 
 \end{document}
